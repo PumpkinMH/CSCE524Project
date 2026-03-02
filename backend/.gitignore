@@ -1,0 +1,23 @@
+# 1. Python Bytecode (Generated when you run the app)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 2. Virtual Environment (DO NOT UPLOAD THIS)
+venv/
+ENV/
+env/
+
+# 3. Django Specific
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# 4. OS Specific (Mac/Windows junk)
+.DS_Store
+Thumbs.db
+
+# 5. Environment Variables / Secrets
+.env
