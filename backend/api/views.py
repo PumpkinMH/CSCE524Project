@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .business import MedicationBusiness, ScheduleBusiness, DoseLogBusiness
+from . import serializers
 import uuid
 from datetime import datetime
 from django.utils.decorators import method_decorator
@@ -36,6 +37,10 @@ class MedicationListCreateView(APIView):
     def post(self, request):
         medication_data = request.data
         new_med = MedicationBusiness.add_new_medication(medication_data)
+        serializer = serializers.MedicationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        new_med = MedicationBusiness.add_new_medication(serializer.validated_data)
         return Response(new_med, status=status.HTTP_201_CREATED)
 
 @method_decorator(_api_error_handler, name='dispatch')
@@ -56,6 +61,10 @@ class MedicationDetailsUpdateView(APIView):
     """
     def patch(self, request, medication_id: uuid.UUID):
         MedicationBusiness.update_medication_details(str(medication_id), request.data)
+        serializer = serializers.MedicationUpdateDetailsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        MedicationBusiness.update_medication_details(str(medication_id), serializer.validated_data)
         return Response({'status': 'details updated'}, status=status.HTTP_200_OK)
 
 @method_decorator(_api_error_handler, name='dispatch')
@@ -69,6 +78,10 @@ class MedicationUpgradeView(APIView):
         if not new_strength:
             return Response({'error': 'new_strength is required'}, status=status.HTTP_400_BAD_REQUEST)
         new_med = MedicationBusiness.upgrade_prescription(str(medication_id), new_strength)
+        serializer = serializers.MedicationUpgradeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        new_med = MedicationBusiness.upgrade_prescription(str(medication_id), serializer.validated_data['new_strength'])
         return Response(new_med, status=status.HTTP_200_OK)
 
 @method_decorator(_api_error_handler, name='dispatch')
@@ -105,8 +118,11 @@ class MedicationRefillView(APIView):
             amount_added = float(amount_added)
         except (ValueError, TypeError):
             return Response({'error': 'amount_added must be a number'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = serializers.RefillSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         
         MedicationBusiness.refill_medication(str(medication_id), amount_added)
+        MedicationBusiness.refill_medication(str(medication_id), serializer.validated_data['amount_added'])
         return Response({'status': 'medication refilled'}, status=status.HTTP_200_OK)
 
 @method_decorator(_api_error_handler, name='dispatch')
@@ -130,6 +146,10 @@ class ScheduleListCreateView(APIView):
     """
     def post(self, request):
         new_schedule = ScheduleBusiness.create_schedule(request.data)
+        serializer = serializers.ScheduleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        new_schedule = ScheduleBusiness.create_schedule(serializer.validated_data)
         return Response(new_schedule, status=status.HTTP_201_CREATED)
 
 @method_decorator(_api_error_handler, name='dispatch')
@@ -168,6 +188,10 @@ class DailyDoseView(APIView):
             return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
             
         doses = DoseLogBusiness.get_daily_planned_doses(target_date_str)
+        serializer = serializers.DailyDoseQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        
+        doses = DoseLogBusiness.get_daily_planned_doses(str(serializer.validated_data['date']))
         return Response(doses, status=status.HTTP_200_OK)
 
 @method_decorator(_api_error_handler, name='dispatch')
