@@ -200,3 +200,24 @@ class DoseLogDAO:
         """
         with connection.cursor() as cursor:
             cursor.execute(query, [medication_id, current_timestamp])
+
+    @staticmethod
+    def update_scheduled_datetime(log_id, new_datetime):
+        """Updates the scheduled_datetime for a single dose log."""
+        query = "UPDATE dose_logs SET scheduled_datetime = %s WHERE log_id = %s;"
+        with connection.cursor() as cursor:
+            cursor.execute(query, [new_datetime, log_id])
+
+    @staticmethod
+    def update_dose_details(log_id, new_strength, new_quantity):
+        """Updates the scheduled strength and quantity for a single dose log."""
+        query = "UPDATE dose_logs SET scheduled_strength = %s, scheduled_quantity = %s WHERE log_id = %s;"
+        with connection.cursor() as cursor:
+            cursor.execute(query, [new_strength, new_quantity, log_id])
+
+    @staticmethod
+    def update_log_notes(log_id, notes):
+        """Updates the notes for a single dose log."""
+        query = "UPDATE dose_logs SET notes = %s WHERE log_id = %s;"
+        with connection.cursor() as cursor:
+            cursor.execute(query, [notes, log_id])
