@@ -2,32 +2,18 @@ import os
 import django
 from datetime import timedelta
 
-# 1. Setup Django environment to talk to your Data Access Layer
+# Setup Django environment to talk to your Data Access Layer
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'medtracker.settings')
 django.setup()
 
 from django.utils import timezone
-from api.models import User, Medication, DoseLog
-
-def get_day_bounds(target_date):
-    """Calculates the exact start and end of a specific date."""
-    start_of_day = timezone.make_aware(timezone.datetime.combine(target_date, timezone.datetime.min.time()))
-    end_of_day = start_of_day + timedelta(days=1)
-    return start_of_day, end_of_day
+from api.dao import MedicationDAO, DoseLogDAO
 
 def main():
     print("\n========================================")
-    print("       MEDISAFE TERMINAL DASHBOARD      ")
+    print("      MEDISAFE TERMINAL DASHBOARD      ")
     print("========================================\n")
-    
-    email = input("Please enter your email to log in: ")
-    
-    try:
-        current_user = User.objects.get(email=email)
-        print(f"\nWelcome back, {current_user.first_name}!")
-    except User.DoesNotExist:
-        print("\nError: User not found. Please check the email and try again.")
-        return
+    print("Welcome back! (Single-User Mode Active)\n")
 
     offset_days = 0 
 
@@ -55,50 +41,56 @@ def main():
         choice = input("\nSelect an option (1-6): ")
         
         if choice == '1':
-            start, end = get_day_bounds(target_date)
+            # Fetching from the Database via our Manual DAO
+            logs = DoseLogDAO.get_logs_for_date(target_date)
             
-            # Fetching from the DoseLog table via the ORM (Our DAO)
-            logs = DoseLog.objects.filter(
-                medication__user=current_user,
-                scheduled_datetime__gte=start,
-                scheduled_datetime__lt=end
-            ).order_by('scheduled_datetime')
+            print(f"\n*** Schedule for {target_date.strftime('%A, %b %d')} ***")
             
-            print(f"\n--- Schedule for {target_date.strftime('%A, %b %d')} ---")
-            
-            if not logs.exists():
+            if not logs:
                 print("  No medications scheduled for this day.")
             else:
-                taken = logs.filter(status='taken')
-                pending = logs.filter(status='pending')
-                missed = logs.filter(status__in=['missed', 'skipped'])
+                # Grouping the dictionary results using Python list comprehensions
+                taken = [log for log in logs if log['status'] == 'taken']
+                pending = [log for log in logs if log['status'] == 'pending']
+                missed = [log for log in logs if log['status'] in ['missed', 'skipped']]
                 
-                if taken.exists():
+                if taken:
                     print("\n[ ALREADY TAKEN ]")
                     for log in taken:
-                        print(f"  v {log.scheduled_datetime.strftime('%I:%M %p')}: {log.medication.name}")
+                        time_str = log['scheduled_datetime'].strftime('%I:%M %p')
+                        print(f"  v {time_str}: {log['name']}")
                 
-                if pending.exists():
+                if pending:
                     print("\n[ UPCOMING / PENDING ]")
                     for log in pending:
-                        print(f"  - {log.scheduled_datetime.strftime('%I:%M %p')}: {log.medication.name}")
+                        time_str = log['scheduled_datetime'].strftime('%I:%M %p')
+                        print(f"  - {time_str}: {log['name']}")
                         
-                if missed.exists():
+                if missed:
                     print("\n[ MISSED / SKIPPED ]")
                     for log in missed:
-                        print(f"  x {log.scheduled_datetime.strftime('%I:%M %p')}: {log.medication.name}")
+                        time_str = log['scheduled_datetime'].strftime('%I:%M %p')
+                        print(f"  x {time_str}: {log['name']}")
 
         elif choice == '2': offset_days -= 1
         elif choice == '3': offset_days += 1
         elif choice == '4': offset_days = 0
         elif choice == '5':
-            print("\n--- YOUR MEDICATIONS ---")
-            meds = Medication.objects.filter(user=current_user, is_active=True)
-            for med in meds:
-                print(f"  * {med.name} ({med.strength}) - {med.condition_treated}")
+            print("\n*** YOUR MEDICATIONS ***")
+            # Fetch all meds, then filter active ones in Python
+            meds = MedicationDAO.get_all()
+            active_meds = [m for m in meds if m['is_active']]
+            
+            if not active_meds:
+                print("  No active medications found.")
+            for med in active_meds:
+                print(f"  * {med['name']} ({med['strength']}), {med['condition_treated']}")
+                
         elif choice == '6':
-            print("Logging out.")
+            print("Exiting application.")
             break
+        else:
+            print("Invalid selection, please try again.")
             
 if __name__ == "__main__":
     main()
