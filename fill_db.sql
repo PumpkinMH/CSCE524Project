@@ -1,52 +1,77 @@
--- 1. Insert 3 Users
-INSERT INTO users (user_id, email, password_hash, first_name, timezone) VALUES
-('11111111-1111-1111-1111-111111111111', 'mabel@example.com', 'hashed_password_1', 'Mabel', 'America/New_York'),
-('22222222-2222-2222-2222-222222222222', 'john.doe@example.com', 'hashed_password_2', 'John', 'America/Chicago'),
-('33333333-3333-3333-3333-333333333333', 'sarah.smith@example.com', 'hashed_password_3', 'Sarah', 'America/Los_Angeles');
+-- 1. Wipe all existing data cleanly without dropping the tables
+TRUNCATE TABLE dose_logs, schedules, medications CASCADE;
 
--- 2. Insert 4 Medications (2 for Mabel, 1 for John, 1 for Sarah)
-INSERT INTO medications (medication_id, user_id, name, medication_type, strength, condition_treated, instructions, amount_left, refill_threshold, is_active, treatment_duration_days) VALUES
-('44444444-4444-4444-4444-444444444441', '11111111-1111-1111-1111-111111111111', 'Lisinopril', 'tablet', '10mg', 'Blood Pressure', 'Take with a full glass of water', 20, 5, TRUE, 365),
-('44444444-4444-4444-4444-444444444442', '11111111-1111-1111-1111-111111111111', 'Vitamin D3', 'capsule', '5000 IU', 'Supplement', 'Take with a meal', 60, 10, TRUE, 365),
-('44444444-4444-4444-4444-444444444443', '22222222-2222-2222-2222-222222222222', 'Amoxicillin', 'capsule', '500mg', 'Infection', 'Take until completely finished', 4, 0, TRUE, 10),
-('44444444-4444-4444-4444-444444444444', '33333333-3333-3333-3333-333333333333', 'Ibuprofen', 'tablet', '200mg', 'Pain Relief', 'Take as needed for pain', 40, 5, TRUE, 30);
+-- 2. Insert 5 Medications (Rows 1-5)
+INSERT INTO medications (medication_id, name, medication_type, strength, condition_treated, instructions, amount_left, refill_threshold, is_active) VALUES
+('11111111-1111-1111-1111-111111111111', 'Lisinopril', 'tablet', '10mg', 'Hypertension', 'Take with water', 30, 5, TRUE),
+('22222222-2222-2222-2222-222222222222', 'Metformin', 'tablet', '500mg', 'Type 2 Diabetes', 'Take with meals', 60, 10, TRUE),
+('33333333-3333-3333-3333-333333333333', 'Atorvastatin', 'capsule', '20mg', 'High Cholesterol', 'Take before bed', 25, 5, TRUE),
+('44444444-4444-4444-4444-444444444444', 'Amoxicillin', 'capsule', '250mg', 'Infection', 'Finish entire course', 0, 0, FALSE),
+('55555555-5555-5555-5555-555555555555', 'Amoxicillin', 'capsule', '500mg', 'Infection', 'Updated higher dose', 14, 0, TRUE);
 
--- 3. Insert 4 Schedules
-INSERT INTO schedules (schedule_id, medication_id, frequency_type, frequency_value, reminder_times) VALUES
-('55555555-5555-5555-5555-555555555551', '44444444-4444-4444-4444-444444444441', 'daily', '1', ARRAY['08:00:00']::TIME[]),
-('55555555-5555-5555-5555-555555555552', '44444444-4444-4444-4444-444444444442', 'daily', '1', ARRAY['09:00:00']::TIME[]),
-('55555555-5555-5555-5555-555555555553', '44444444-4444-4444-4444-444444444443', 'interval', 'twice daily', ARRAY['08:00:00', '20:00:00']::TIME[]),
-('55555555-5555-5555-5555-555555555554', '44444444-4444-4444-4444-444444444444', 'as_needed', 'every 6 hours', ARRAY[]::TIME[]);
+-- Link the updated medication
+UPDATE medications SET previous_medication_id = '44444444-4444-4444-4444-444444444444' WHERE medication_id = '55555555-5555-5555-5555-555555555555';
 
--- 4. Insert 42 Dose Logs to easily clear the 50 row minimum across all tables combined
-INSERT INTO dose_logs (medication_id, scheduled_datetime, actual_datetime_taken, scheduled_strength, actual_strength_taken, scheduled_quantity, actual_quantity_taken, status, notes)
-SELECT 
-    '44444444-4444-4444-4444-444444444441', -- Mabel's Lisinopril
-    gen_date + TIME '08:00:00',
-    gen_date + TIME '08:15:00',
-    '10mg', '10mg', 1, 1, 'taken', NULL
-FROM generate_series(CURRENT_DATE - INTERVAL '14 days', CURRENT_DATE - INTERVAL '1 day', '1 day'::interval) AS gen_date;
+-- 3. Insert 5 Schedules (Rows 6-10)
+INSERT INTO schedules (medication_id, frequency_type, frequency_value, reminder_times) VALUES
+('11111111-1111-1111-1111-111111111111', 'daily', '1', ARRAY['08:00:00'::TIME]),
+('22222222-2222-2222-2222-222222222222', 'daily', '2', ARRAY['08:00:00'::TIME, '20:00:00'::TIME]),
+('33333333-3333-3333-3333-333333333333', 'daily', '1', ARRAY['21:00:00'::TIME]),
+('44444444-4444-4444-4444-444444444444', 'weekly', '1', ARRAY['12:00:00'::TIME]),
+('55555555-5555-5555-5555-555555555555', 'interval', '8 hours', ARRAY['08:00:00'::TIME, '16:00:00'::TIME, '23:59:00'::TIME]);
 
-INSERT INTO dose_logs (medication_id, scheduled_datetime, actual_datetime_taken, scheduled_strength, actual_strength_taken, scheduled_quantity, actual_quantity_taken, status, notes)
-SELECT 
-    '44444444-4444-4444-4444-444444444442', -- Mabel's Vitamin D
-    gen_date + TIME '09:00:00',
-    gen_date + TIME '09:05:00',
-    '5000 IU', '5000 IU', 1, 1, 'taken', 'Took with breakfast'
-FROM generate_series(CURRENT_DATE - INTERVAL '14 days', CURRENT_DATE - INTERVAL '1 day', '1 day'::interval) AS gen_date;
+-- 4. Insert 45 Dose Logs (Rows 11-55)
+INSERT INTO dose_logs (medication_id, scheduled_datetime, actual_datetime_taken, scheduled_strength, actual_strength_taken, scheduled_quantity, actual_quantity_taken, status) VALUES
 
-INSERT INTO dose_logs (medication_id, scheduled_datetime, actual_datetime_taken, scheduled_strength, actual_strength_taken, scheduled_quantity, actual_quantity_taken, status, notes)
-SELECT 
-    '44444444-4444-4444-4444-444444444443', -- John's Amoxicillin (Morning Dose)
-    gen_date + TIME '08:00:00',
-    gen_date + TIME '07:50:00',
-    '500mg', '500mg', 1, 1, 'taken', NULL
-FROM generate_series(CURRENT_DATE - INTERVAL '7 days', CURRENT_DATE - INTERVAL '1 day', '1 day'::interval) AS gen_date;
+-- Medication 1 Logs (Lisinopril, 1x daily morning)
+('11111111-1111-1111-1111-111111111111', '2026-03-10 08:00:00+00', '2026-03-10 08:05:00+00', '10mg', '10mg', 1, 1, 'taken'),
+('11111111-1111-1111-1111-111111111111', '2026-03-11 08:00:00+00', '2026-03-11 08:15:00+00', '10mg', '10mg', 1, 1, 'taken'),
+('11111111-1111-1111-1111-111111111111', '2026-03-12 08:00:00+00', '2026-03-12 08:00:00+00', '10mg', '10mg', 1, 1, 'taken'),
+('11111111-1111-1111-1111-111111111111', '2026-03-13 08:00:00+00', '2026-03-13 09:30:00+00', '10mg', '10mg', 1, 1, 'taken'),
+('11111111-1111-1111-1111-111111111111', '2026-03-14 08:00:00+00', '2026-03-14 08:02:00+00', '10mg', '10mg', 1, 1, 'taken'),
+('11111111-1111-1111-1111-111111111111', '2026-03-15 08:00:00+00', '2026-03-15 08:10:00+00', '10mg', '10mg', 1, 1, 'taken'),
+('11111111-1111-1111-1111-111111111111', '2026-03-16 08:00:00+00', NULL, '10mg', NULL, 1, NULL, 'pending'),
+('11111111-1111-1111-1111-111111111111', '2026-03-17 08:00:00+00', NULL, '10mg', NULL, 1, NULL, 'pending'),
+('11111111-1111-1111-1111-111111111111', '2026-03-18 08:00:00+00', NULL, '10mg', NULL, 1, NULL, 'pending'),
 
-INSERT INTO dose_logs (medication_id, scheduled_datetime, actual_datetime_taken, scheduled_strength, actual_strength_taken, scheduled_quantity, actual_quantity_taken, status, notes)
-SELECT 
-    '44444444-4444-4444-4444-444444444443', -- John's Amoxicillin (Evening Dose)
-    gen_date + TIME '20:00:00',
-    gen_date + TIME '20:30:00',
-    '500mg', '500mg', 1, 1, 'taken', NULL
-FROM generate_series(CURRENT_DATE - INTERVAL '7 days', CURRENT_DATE - INTERVAL '1 day', '1 day'::interval) AS gen_date;
+-- Medication 2 Logs (Metformin, 2x daily morning and evening)
+('22222222-2222-2222-2222-222222222222', '2026-03-11 08:00:00+00', '2026-03-11 08:00:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('22222222-2222-2222-2222-222222222222', '2026-03-11 20:00:00+00', '2026-03-11 20:20:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('22222222-2222-2222-2222-222222222222', '2026-03-12 08:00:00+00', '2026-03-12 08:05:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('22222222-2222-2222-2222-222222222222', '2026-03-12 20:00:00+00', NULL, '500mg', NULL, 1, NULL, 'missed'),
+('22222222-2222-2222-2222-222222222222', '2026-03-13 08:00:00+00', '2026-03-13 08:00:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('22222222-2222-2222-2222-222222222222', '2026-03-13 20:00:00+00', '2026-03-13 20:45:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('22222222-2222-2222-2222-222222222222', '2026-03-14 08:00:00+00', '2026-03-14 07:55:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('22222222-2222-2222-2222-222222222222', '2026-03-14 20:00:00+00', '2026-03-14 20:10:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('22222222-2222-2222-2222-222222222222', '2026-03-15 08:00:00+00', '2026-03-15 08:00:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('22222222-2222-2222-2222-222222222222', '2026-03-15 20:00:00+00', NULL, '500mg', NULL, 1, NULL, 'pending'),
+('22222222-2222-2222-2222-222222222222', '2026-03-16 08:00:00+00', NULL, '500mg', NULL, 1, NULL, 'pending'),
+('22222222-2222-2222-2222-222222222222', '2026-03-16 20:00:00+00', NULL, '500mg', NULL, 1, NULL, 'pending'),
+
+-- Medication 3 Logs (Atorvastatin, 1x daily night)
+('33333333-3333-3333-3333-333333333333', '2026-03-11 21:00:00+00', '2026-03-11 21:30:00+00', '20mg', '20mg', 1, 1, 'taken'),
+('33333333-3333-3333-3333-333333333333', '2026-03-12 21:00:00+00', '2026-03-12 21:05:00+00', '20mg', '20mg', 1, 1, 'taken'),
+('33333333-3333-3333-3333-333333333333', '2026-03-13 21:00:00+00', NULL, '20mg', NULL, 1, NULL, 'missed'),
+('33333333-3333-3333-3333-333333333333', '2026-03-14 21:00:00+00', '2026-03-14 21:10:00+00', '20mg', '20mg', 1, 1, 'taken'),
+('33333333-3333-3333-3333-333333333333', '2026-03-15 21:00:00+00', NULL, '20mg', NULL, 1, NULL, 'pending'),
+('33333333-3333-3333-3333-333333333333', '2026-03-16 21:00:00+00', NULL, '20mg', NULL, 1, NULL, 'pending'),
+('33333333-3333-3333-3333-333333333333', '2026-03-17 21:00:00+00', NULL, '20mg', NULL, 1, NULL, 'pending'),
+('33333333-3333-3333-3333-333333333333', '2026-03-18 21:00:00+00', NULL, '20mg', NULL, 1, NULL, 'pending'),
+
+-- Medication 5 Logs (Amoxicillin, 3x daily)
+('55555555-5555-5555-5555-555555555555', '2026-03-12 08:00:00+00', '2026-03-12 08:00:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('55555555-5555-5555-5555-555555555555', '2026-03-12 16:00:00+00', '2026-03-12 16:15:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('55555555-5555-5555-5555-555555555555', '2026-03-12 23:59:00+00', NULL, '500mg', NULL, 1, NULL, 'missed'),
+('55555555-5555-5555-5555-555555555555', '2026-03-13 08:00:00+00', '2026-03-13 08:10:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('55555555-5555-5555-5555-555555555555', '2026-03-13 16:00:00+00', '2026-03-13 16:05:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('55555555-5555-5555-5555-555555555555', '2026-03-13 23:59:00+00', '2026-03-13 23:50:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('55555555-5555-5555-5555-555555555555', '2026-03-14 08:00:00+00', '2026-03-14 08:00:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('55555555-5555-5555-5555-555555555555', '2026-03-14 16:00:00+00', NULL, '500mg', NULL, 1, NULL, 'missed'),
+('55555555-5555-5555-5555-555555555555', '2026-03-14 23:59:00+00', '2026-03-14 23:55:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('55555555-5555-5555-5555-555555555555', '2026-03-15 08:00:00+00', '2026-03-15 08:20:00+00', '500mg', '500mg', 1, 1, 'taken'),
+('55555555-5555-5555-5555-555555555555', '2026-03-15 16:00:00+00', NULL, '500mg', NULL, 1, NULL, 'pending'),
+('55555555-5555-5555-5555-555555555555', '2026-03-15 23:59:00+00', NULL, '500mg', NULL, 1, NULL, 'pending'),
+('55555555-5555-5555-5555-555555555555', '2026-03-16 08:00:00+00', NULL, '500mg', NULL, 1, NULL, 'pending'),
+('55555555-5555-5555-5555-555555555555', '2026-03-16 16:00:00+00', NULL, '500mg', NULL, 1, NULL, 'pending'),
+('55555555-5555-5555-5555-555555555555', '2026-03-16 23:59:00+00', NULL, '500mg', NULL, 1, NULL, 'pending'),
+('55555555-5555-5555-5555-555555555555', '2026-03-17 08:00:00+00', NULL, '500mg', NULL, 1, NULL, 'pending');
