@@ -6,6 +6,7 @@ from . import serializers
 import uuid
 from datetime import datetime
 from django.utils.decorators import method_decorator
+from rest_framework.exceptions import APIException
 
 def _api_error_handler(func):
     """Decorator for APIView dispatch method to handle common exceptions."""
@@ -14,6 +15,9 @@ def _api_error_handler(func):
             return func(*args, **kwargs)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except APIException as e:
+            # Catch DRF-specific exceptions (like ValidationErrors) to return clean JSON
+            return Response({'error': e.detail}, status=e.status_code)
         except Exception as e:
             # In a real app, you'd want to log this exception.
             # import logging
