@@ -6,17 +6,6 @@ def _map_results(cursor):
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 class MedicationDAO:
-    
-    @staticmethod
-    def create(name, med_type, strength, condition_treated, instructions, amount_left, refill_threshold, is_active=True):
-        query = """
-            INSERT INTO medications (name, medication_type, strength, condition_treated, instructions, amount_left, refill_threshold, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING medication_id;
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, [name, med_type, strength, condition_treated, instructions, amount_left, refill_threshold, is_active])
-            return cursor.fetchone()[0] # Returns the newly generated UUID
 
     @staticmethod
     def get_all():
@@ -49,6 +38,27 @@ class MedicationDAO:
         query = "DELETE FROM medications WHERE medication_id = %s;"
         with connection.cursor() as cursor:
             cursor.execute(query, [medication_id])
+    
+    @staticmethod
+    def create(name, med_type, strength, condition_treated, instructions, amount_left, refill_threshold, previous_medication_id=None, is_active=True):
+        query = """
+            INSERT INTO medications (name, medication_type, strength, condition_treated, instructions, amount_left, refill_threshold, previous_medication_id, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING medication_id;
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [name, med_type, strength, condition_treated, instructions, amount_left, refill_threshold, previous_medication_id, is_active])
+            return cursor.fetchone()[0]
+
+    @staticmethod
+    def update_details(medication_id, strength, condition_treated, instructions):
+        query = """
+            UPDATE medications 
+            SET strength = %s, condition_treated = %s, instructions = %s
+            WHERE medication_id = %s;
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [strength, condition_treated, instructions, medication_id])
 
 
 class ScheduleDAO:
@@ -149,3 +159,44 @@ class DoseLogDAO:
         query = "DELETE FROM dose_logs WHERE log_id = %s;"
         with connection.cursor() as cursor:
             cursor.execute(query, [log_id])
+
+    @staticmethod
+    def get_by_id(log_id):
+        query = "SELECT * FROM dose_logs WHERE log_id = %s;"
+        with connection.cursor() as cursor:
+            cursor.execute(query, [log_id])
+            results = _map_results(cursor)
+            return results[0] if results else None
+
+    @staticmethod
+    def create_ad_hoc(medication_id, actual_datetime_taken, scheduled_strength, actual_quantity):
+        """Creates a dose log that is instantly marked as taken."""
+        query = """
+            INSERT INTO dose_logs (medication_id, scheduled_datetime, actual_datetime_taken, scheduled_strength, actual_strength_taken, scheduled_quantity, actual_quantity_taken, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'taken')
+            RETURNING log_id;
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [medication_id, actual_datetime_taken, actual_datetime_taken, scheduled_strength, scheduled_strength, actual_quantity, actual_quantity])
+            return cursor.fetchone()[0]
+
+    @staticmethod
+    def update_log_state(log_id, status, actual_datetime_taken=None, actual_quantity_taken=None):
+        """A flexible update method for status changes (skipped, missed, taken, or reverting to pending)."""
+        query = """
+            UPDATE dose_logs 
+            SET status = %s, actual_datetime_taken = %s, actual_quantity_taken = %s
+            WHERE log_id = %s;
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [status, actual_datetime_taken, actual_quantity_taken, log_id])
+
+    @staticmethod
+    def delete_future_pending(medication_id, current_timestamp):
+        """Deletes only pending logs that occur after the given timestamp."""
+        query = """
+            DELETE FROM dose_logs 
+            WHERE medication_id = %s AND status = 'pending' AND scheduled_datetime > %s;
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [medication_id, current_timestamp])
