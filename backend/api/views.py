@@ -239,13 +239,12 @@ class AdHocDoseCreateView(APIView):
         serializer = serializers.AdHocDoseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        new_dose = DoseLogBusiness.add_ad_hoc_dose(
+        DoseLogBusiness.add_ad_hoc_dose(
             str(serializer.validated_data['medication_id']), 
             serializer.validated_data['quantity'], 
             serializer.validated_data.get('strength')
         )
-        # Return the newly created object, which is a RESTful best practice.
-        return Response(new_dose, status=status.HTTP_201_CREATED)
+        return Response({'status': 'ad-hoc dose created'}, status=status.HTTP_201_CREATED)
 
 @method_decorator(_api_error_handler, name='dispatch')
 class DoseSweepExpiredView(APIView):
