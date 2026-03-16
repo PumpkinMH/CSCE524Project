@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-#sr-m4=a-kg3431l#b_pc$*e90c=jd6n2g6o*cz0#!f$-21(-%
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -81,18 +81,32 @@ WSGI_APPLICATION = 'medtracker.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'mabel', # Change to your Beekeeper DB name
+#         'USER': 'mabel',           # Change to your PostgreSQL username
+#         'PASSWORD': 'Tacking-Oversight-Earache',  # Change to your PostgreSQL password
+#         'HOST': 'localhost',
+#         'PORT': '5432',               # 5432 is the standard PostgreSQL port
+#         'OPTIONS': {
+#             'options': '-c search_path=medtracker,public'
+#         },
+#     }
+# }
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'mabel', # Change to your Beekeeper DB name
-        'USER': 'mabel',           # Change to your PostgreSQL username
-        'PASSWORD': 'Tacking-Oversight-Earache',  # Change to your PostgreSQL password
-        'HOST': 'localhost',
-        'PORT': '5432',               # 5432 is the standard PostgreSQL port
-        'OPTIONS': {
-            'options': '-c search_path=medtracker,public'
-        },
-    }
+    'default': dj_database_url.config(
+        # This pulls the DATABASE_URL environment variable from Render
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+}
+
+# Add the search path logic back in so your 'medtracker' schema is recognized
+DATABASES['default']['OPTIONS'] = {
+    'options': '-c search_path=medtracker,public'
 }
 
 
@@ -131,3 +145,4 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
