@@ -25,6 +25,7 @@ urlpatterns = [
     path('doses/<uuid:log_id>/', views.DoseLogDetailView.as_view(), name='dose-detail'), # Combined GET, PATCH, DELETE
     path('doses/<uuid:log_id>/take/', views.DoseLogTakeView.as_view(), name='dose-take'),
     path('doses/<uuid:log_id>/skip/', views.DoseLogSkipView.as_view(), name='dose-skip'),
+    path('doses/<uuid:log_id>/revert/', views.DoseLogRevertView.as_view(), name='dose-revert'),
     path('doses/<uuid:log_id>/reschedule/', views.DoseLogRescheduleView.as_view(), name='dose-reschedule'),
     path('doses/<uuid:log_id>/status/', views.DoseStatusUpdateView.as_view(), name='dose-status-update'),
 ]

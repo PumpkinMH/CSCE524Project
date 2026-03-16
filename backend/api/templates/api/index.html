@@ -1,0 +1,54 @@
+{% extends "api/base.html" %}
+
+{% block content %}
+<div class="mdc-tab-bar" role="tablist" data-mdc-auto-init="MDCTabBar">
+    <div class="mdc-tab-scroller">
+        <div class="mdc-tab-scroller__scroll-area">
+            <div class="mdc-tab-scroller__scroll-content">
+                <button class="mdc-tab mdc-tab--active" role="tab" aria-selected="true" tabindex="0"
+                        hx-get="{% url 'ui:daily_doses_tab' %}"
+                        hx-target="#content-area"
+                        hx-swap="innerHTML">
+                    <span class="mdc-tab__content">
+                        <span class="mdc-tab__text-label">Daily Doses</span>
+                    </span>
+                    <span class="mdc-tab-indicator mdc-tab-indicator--active">
+                        <span class="mdc-tab-indicator__content mdc-tab-indicator__content--underline"></span>
+                    </span>
+                    <span class="mdc-tab__ripple"></span>
+                </button>
+                <button class="mdc-tab" role="tab" aria-selected="false" tabindex="-1"
+                        hx-get="{% url 'ui:medications_tab' %}"
+                        hx-target="#content-area"
+                        hx-swap="innerHTML">
+                    <span class="mdc-tab__content">
+                        <span class="mdc-tab__text-label">My Medications</span>
+                    </span>
+                    <span class="mdc-tab-indicator">
+                        <span class="mdc-tab-indicator__content mdc-tab-indicator__content--underline"></span>
+                    </span>
+                    <span class="mdc-tab__ripple"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<main id="content-area" hx-get="{% url 'ui:daily_doses_tab' %}" hx-trigger="load">
+    <!-- Tab content loaded here -->
+</main>
+
+<script>
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        const trigger = evt.detail.elt;
+        if (trigger.classList.contains('mdc-tab')) {
+            const tabs = document.querySelectorAll('.mdc-tab');
+            tabs.forEach(t => t.classList.remove('mdc-tab--active'));
+            tabs.forEach(t => t.querySelector('.mdc-tab-indicator').classList.remove('mdc-tab-indicator--active'));
+            
+            trigger.classList.add('mdc-tab--active');
+            trigger.querySelector('.mdc-tab-indicator').classList.add('mdc-tab-indicator--active');
+        }
+    });
+</script>
+{% endblock %}

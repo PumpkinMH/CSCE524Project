@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medication Tracker</title>
+    
+    <!-- Material Components for Web -->
+    <link href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- Nunjucks MUST be loaded before client-side-templates -->
+    <script src="https://unpkg.com/nunjucks@3.2.4/browser/nunjucks.min.js"></script>
+
+    <!-- HTMX and extensions -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/client-side-templates.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            font-family: Roboto, sans-serif;
+            background-color: #f5f5f5;
+        }
+        .main-header {
+            background-color: #0077c2; /* Ocean Blue */
+            color: white;
+            position: static; /* Forces the header to push content down instead of floating over it */
+        }
+        .mdc-tab-bar {
+            background-color: #0077c2;
+        }
+        .mdc-tab .mdc-tab__text-label {
+            color: rgba(255, 255, 255, 0.8) !important;
+        }
+        .mdc-tab--active .mdc-tab__text-label {
+            color: white !important;
+        }
+        .mdc-tab-indicator__content--underline {
+            border-color: white !important;
+        }
+        #content-area {
+            padding: 16px;
+        }
+    </style>
+</head>
+<body class="mdc-typography">
+
+    <header class="mdc-top-app-bar main-header">
+        <div class="mdc-top-app-bar__row">
+            <section class="mdc-top-app-bar__section mdc-top-app-bar__section--align-start">
+                <span class="mdc-top-app-bar__title">Medication Tracker</span>
+            </section>
+        </div>
+    </header>
+
+    {% block content %}{% endblock %}
+
+    <script>
+        // Custom HTMX extension to wrap raw JSON arrays into an object Nunjucks can use natively
+        htmx.defineExtension('json-wrap', {
+            transformResponse: function(text, xhr, elt) {
+                try {
+                    let json = JSON.parse(text);
+                    return JSON.stringify({ data: json });
+                } catch (e) {
+                    return text;
+                }
+            }
+        });
+
+        // Initialize Material components on initial page load
+        mdc.autoInit();
+
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            mdc.autoInit(evt.target);
+        });
+    </script>
+</body>
+</html>

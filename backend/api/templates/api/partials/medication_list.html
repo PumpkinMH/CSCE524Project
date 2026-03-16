@@ -1,0 +1,96 @@
+<div class="mdc-layout-grid">
+    <div class="mdc-layout-grid__inner">
+        <div class="mdc-layout-grid__cell mdc-layout-grid__cell--span-4-desktop mdc-layout-grid__cell--span-12-mobile">
+            <div id="med-list-container"
+                 class="mdc-list"
+                 hx-get="/api/medications/"
+                 hx-trigger="load, reload-meds from:body"
+                 hx-ext="json-wrap, client-side-templates"
+                 nunjucks-template="med-list-template">
+              <div class="mdc-list-item">Loading...</div>
+            </div>
+        </div>
+        <div class="mdc-layout-grid__cell mdc-layout-grid__cell--span-8-desktop mdc-layout-grid__cell--span-12-mobile" id="med-detail-area">
+            <div class="mdc-card" style="padding: 1rem;">
+                <p class="mdc-typography--body1">Select a medication to view or edit details.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% verbatim %}
+<template id="med-list-template">
+    {% for med in data %}
+      <div class="mdc-list-item" tabindex="0"
+           hx-get="/api/medications/{{ med.medication_id }}/"
+           hx-target="#med-detail-area"
+           hx-ext="json-wrap, client-side-templates"
+           nunjucks-template="med-detail-template"
+           style="cursor: pointer; border-bottom: 1px solid #eee;">
+        <span class="mdc-list-item__ripple"></span>
+        <span class="mdc-list-item__text">
+          <span class="mdc-list-item__primary-text">{{ med.name }}</span>
+          <span class="mdc-list-item__secondary-text">Left: {{ med.amount_left }}</span>
+        </span>
+      </div>
+    {% endfor %}
+</template>
+
+<template id="med-detail-template">
+    <div class="mdc-card" style="padding: 1rem;">
+        <h2 class="mdc-typography--headline5">{{ data.name }}</h2>
+        
+        <form hx-patch="/api/medications/{{ data.medication_id }}/details/"
+              hx-swap="none"
+              hx-on::after-request="if(event.detail.successful) { alert('Saved!'); htmx.trigger('body', 'reload-meds'); } else { alert('Error saving.'); }">
+            
+            <div style="margin-bottom: 1rem;">
+                <label class="mdc-typography--subtitle2">Name</label><br>
+                <input type="text" name="name" value="{{ data.name }}" style="width: 100%; padding: 8px;">
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <label class="mdc-typography--subtitle2">Strength</label><br>
+                <input type="text" name="strength" value="{{ data.strength }}" style="width: 100%; padding: 8px;">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label class="mdc-typography--subtitle2">Condition Treated</label><br>
+                <input type="text" name="condition_treated" value="{{ data.condition_treated }}" style="width: 100%; padding: 8px;">
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <label class="mdc-typography--subtitle2">Medication Type</label><br>
+                <select name="medication_type" style="width: 100%; padding: 8px;">
+                    <option value="">Select a Type...</option>
+                    {% if data.medication_type == 'tablet' %}<option value="tablet" selected>Tablet</option>{% else %}<option value="tablet">Tablet</option>{% endif %}
+                    {% if data.medication_type == 'capsule' %}<option value="capsule" selected>Capsule</option>{% else %}<option value="capsule">Capsule</option>{% endif %}
+                    {% if data.medication_type == 'liquid' %}<option value="liquid" selected>Liquid</option>{% else %}<option value="liquid">Liquid</option>{% endif %}
+                    {% if data.medication_type == 'injection' %}<option value="injection" selected>Injection</option>{% else %}<option value="injection">Injection</option>{% endif %}
+                    {% if data.medication_type == 'oil' %}<option value="oil" selected>Oil</option>{% else %}<option value="oil">Oil</option>{% endif %}
+                    {% if data.medication_type == 'topical' %}<option value="topical" selected>Topical</option>{% else %}<option value="topical">Topical</option>{% endif %}
+                    {% if data.medication_type == 'other' %}<option value="other" selected>Other</option>{% else %}<option value="other">Other</option>{% endif %}
+                </select>
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <label class="mdc-typography--subtitle2">Amount Left</label><br>
+                <input type="number" step="0.01" name="amount_left" value="{{ data.amount_left }}" style="width: 100%; padding: 8px;">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label class="mdc-typography--subtitle2">Refill Threshold</label><br>
+                <input type="number" step="0.01" name="refill_threshold" value="{{ data.refill_threshold }}" style="width: 100%; padding: 8px;">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label class="mdc-typography--subtitle2">Treatment Duration (Days)</label><br>
+                <input type="number" name="treatment_duration_days" value="{{ data.treatment_duration_days }}" style="width: 100%; padding: 8px;">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label class="mdc-typography--subtitle2">Instructions</label><br>
+                <textarea name="instructions" style="width: 100%; padding: 8px; height: 80px;">{{ data.instructions }}</textarea>
+            </div>
+            
+            <button type="submit" class="mdc-button mdc-button--raised">Save Changes</button>
+        </form>
+    </div>
+</template>
+{% endverbatim %}

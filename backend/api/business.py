@@ -8,12 +8,20 @@ designed to be completely independent of the web framework (Django) and the
 database implementation.
 """
 
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, time, timezone
 from .dao import MedicationDAO, ScheduleDAO, DoseLogDAO
 from decimal import Decimal
 
 class MedicationBusiness:
     """Handles business logic related to medications."""
+
+    @staticmethod
+    def get_medication_by_id(medication_id: str) -> dict:
+        """Fetches a single medication by its ID."""
+        med = MedicationDAO.get_by_id(medication_id)
+        if not med:
+            raise ValueError(f"Medication with ID {medication_id} not found.")
+        return med
 
     @staticmethod
     def add_new_medication(medication_data: dict) -> dict:
@@ -47,13 +55,23 @@ class MedicationBusiness:
 
     @staticmethod
     def update_medication_details(medication_id: str, details_data: dict):
-        """Updates non-critical details of a medication."""
+        """Updates details of a medication and regenerates future schedules."""
         MedicationDAO.update_details(
             medication_id=medication_id,
+            name=details_data.get('name'),
+            med_type=details_data.get('medication_type'),
             strength=details_data.get('strength'),
             condition_treated=details_data.get('condition_treated'),
-            instructions=details_data.get('instructions')
+            instructions=details_data.get('instructions'),
+            amount_left=details_data.get('amount_left'),
+            refill_threshold=details_data.get('refill_threshold'),
+            treatment_duration_days=details_data.get('treatment_duration_days')
         )
+        
+        # Purge future pending logs and regenerate them so they immediately 
+        # pick up the new details (like updated strength or name)
+        DoseLogDAO.delete_future_non_taken(medication_id, datetime.now(timezone.utc))
+        DoseLogBusiness.generate_upcoming_schedule(medication_id)
 
     @staticmethod
     def upgrade_prescription(medication_id: str, new_strength: str) -> dict:
@@ -84,7 +102,7 @@ class MedicationBusiness:
         )
 
         # 3. Delete future pending logs for the old medication
-        DoseLogDAO.delete_future_non_taken(medication_id, datetime.now())
+        DoseLogDAO.delete_future_non_taken(medication_id, datetime.now(timezone.utc))
 
         # 4. Trigger log generation for the new medication
         DoseLogBusiness.generate_upcoming_schedule(new_med_id)
@@ -97,7 +115,7 @@ class MedicationBusiness:
         med = MedicationDAO.get_by_id(medication_id)
         if med:
             MedicationDAO.update(medication_id, med['amount_left'], is_active=False)
-            DoseLogDAO.delete_future_non_taken(medication_id, datetime.now())
+            DoseLogDAO.delete_future_non_taken(medication_id, datetime.now(timezone.utc))
 
     @staticmethod
     def purge_medication(medication_id: str):
@@ -180,7 +198,7 @@ class ScheduleBusiness:
         medication_id = schedule_data.get('medication_id')
         
         if medication_id:
-            DoseLogDAO.delete_future_non_taken(medication_id, datetime.now())
+            DoseLogDAO.delete_future_non_taken(medication_id, datetime.now(timezone.utc))
             
             # Regenerate the base upcoming schedule
             DoseLogBusiness.generate_upcoming_schedule(medication_id)
@@ -189,7 +207,7 @@ class ScheduleBusiness:
     def remove_schedule(schedule_id: str, medication_id: str):
         """Deletes a schedule and its future pending logs."""
         ScheduleDAO.delete(schedule_id)
-        DoseLogDAO.delete_future_non_taken(medication_id, datetime.now())
+        DoseLogDAO.delete_future_non_taken(medication_id, datetime.now(timezone.utc))
 
 
 class DoseLogBusiness:
@@ -207,7 +225,7 @@ class DoseLogBusiness:
         Automatically generates future doses if they don't exist yet.
         """
         start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
-        today = datetime.now().date()
+        today = datetime.now(timezone.utc).date()
         
         active_meds = MedicationBusiness.get_active_inventory()
         weekly_logs = []
@@ -260,7 +278,7 @@ class DoseLogBusiness:
         DoseLogDAO.update_log_state(
             log_id, 
             'taken',
-            actual_datetime_taken=datetime.now(),
+            actual_datetime_taken=datetime.now(timezone.utc),
             actual_quantity_taken=quantity_taken_decimal
         )
 
@@ -302,7 +320,7 @@ class DoseLogBusiness:
 
         log_id = DoseLogDAO.create_ad_hoc(
             medication_id,
-            datetime.now(),
+            datetime.now(timezone.utc),
             actual_strength,
             quantity_decimal
         )
@@ -325,7 +343,7 @@ class DoseLogBusiness:
         if not med or not med['is_active']:
             return
 
-        today = datetime.now().date()
+        today = datetime.now(timezone.utc).date()
         
         # Check treatment duration if it exists
         if med.get('treatment_duration_days'):
@@ -353,7 +371,7 @@ class DoseLogBusiness:
         date_str = target_date.strftime("%Y-%m-%d")
         existing_logs = DoseLogDAO.get_logs_for_date(date_str)
         existing_dts = {
-            log['scheduled_datetime'].replace(tzinfo=None) 
+            log['scheduled_datetime'] 
             for log in existing_logs 
             if log['medication_id'] == medication_id and log.get('scheduled_datetime')
         }
@@ -361,7 +379,7 @@ class DoseLogBusiness:
         for sched in schedules:
             if sched['frequency_type'] == 'daily':
                 for t in sched['reminder_times']:
-                    dt = datetime.combine(target_date, t)
+                    dt = datetime.combine(target_date, t, tzinfo=timezone.utc)
                     if dt not in existing_dts:
                         DoseLogDAO.create(medication_id, dt, med['strength'], 1)
     
@@ -369,9 +387,9 @@ class DoseLogBusiness:
     def sweep_expired_doses():
         """Finds pending doses older than 24 hours and marks them as 'missed'."""
         pending_logs = DoseLogDAO.get_pending_logs()
-        yesterday = datetime.now() - timedelta(hours=24)
+        yesterday = datetime.now(timezone.utc) - timedelta(hours=24)
         for log in pending_logs:
-            if log['scheduled_datetime'].replace(tzinfo=None) < yesterday:
+            if log['scheduled_datetime'] < yesterday:
                 DoseLogDAO.update_log_state(log['log_id'], 'missed')
 
     @staticmethod
@@ -409,7 +427,7 @@ class DoseLogBusiness:
         elif old_status in ('pending', 'skipped', 'missed') and new_status == 'taken':
             quantity_to_log = new_quantity_decimal if new_quantity_decimal is not None else scheduled_quantity_decimal
             inventory_change = -quantity_to_log # Deduct from inventory (negative value)
-            DoseLogDAO.update_log_state(log_id, new_status, actual_quantity_taken=quantity_to_log, actual_datetime_taken=datetime.now()) # Pass Decimal
+            DoseLogDAO.update_log_state(log_id, new_status, actual_quantity_taken=quantity_to_log, actual_datetime_taken=datetime.now(timezone.utc)) # Pass Decimal
 
         # Case 3: Modifying an already 'taken' dose's quantity
         elif old_status == 'taken' and new_status == 'taken' and new_quantity_decimal is not None:

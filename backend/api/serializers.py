@@ -10,8 +10,13 @@ class MedicationSerializer(serializers.Serializer):
     refill_threshold = serializers.FloatField(min_value=0, default=0)
 
 class MedicationUpdateDetailsSerializer(serializers.Serializer):
+    name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    medication_type = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     strength = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     condition_treated = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    amount_left = serializers.FloatField(min_value=0, required=False, allow_null=True)
+    refill_threshold = serializers.FloatField(min_value=0, required=False, allow_null=True)
+    treatment_duration_days = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     instructions = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 class MedicationUpgradeSerializer(serializers.Serializer):

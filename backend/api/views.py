@@ -51,9 +51,14 @@ class MedicationListCreateView(APIView):
 @method_decorator(_api_error_handler, name='dispatch')
 class MedicationDetailView(APIView):
     """
-    Purge a medication.
+    Retrieve or purge a medication.
+    GET: /api/medications/<uuid:medication_id>/
     DELETE: /api/medications/<uuid:medication_id>/
     """
+    def get(self, request, medication_id: uuid.UUID):
+        med = MedicationBusiness.get_medication_by_id(str(medication_id))
+        return Response(med, status=status.HTTP_200_OK)
+
     def delete(self, request, medication_id: uuid.UUID):
         MedicationBusiness.purge_medication(str(medication_id))
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -238,6 +243,16 @@ class DoseLogSkipView(APIView):
         
         DoseLogBusiness.log_dose_as_skipped(str(log_id), serializer.validated_data.get('notes'))
         return Response({'status': 'dose marked as skipped'}, status=status.HTTP_200_OK)
+
+@method_decorator(_api_error_handler, name='dispatch')
+class DoseLogRevertView(APIView):
+    """
+    Revert a dose back to pending (untake / unskip).
+    POST: /api/doses/<uuid:log_id>/revert/
+    """
+    def post(self, request, log_id: uuid.UUID):
+        DoseLogBusiness.revert_or_update_dose_status(str(log_id), 'pending')
+        return Response({'status': 'dose reverted to pending'}, status=status.HTTP_200_OK)
 
 @method_decorator(_api_error_handler, name='dispatch')
 class DoseLogRescheduleView(APIView):

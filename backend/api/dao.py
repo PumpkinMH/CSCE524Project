@@ -39,12 +39,19 @@ class MedicationDAO:
         return med.medication_id
 
     @staticmethod
-    def update_details(medication_id, strength, condition_treated, instructions):
-        Medication.objects.filter(pk=medication_id).update(
-            strength=strength, 
-            condition_treated=condition_treated, 
-            instructions=instructions
-        )
+    def update_details(medication_id, name=None, med_type=None, strength=None, condition_treated=None, instructions=None, amount_left=None, refill_threshold=None, treatment_duration_days=None):
+        update_data = {}
+        if name is not None: update_data['name'] = name
+        if med_type is not None: update_data['medication_type'] = med_type
+        if strength is not None: update_data['strength'] = strength
+        if condition_treated is not None: update_data['condition_treated'] = condition_treated
+        if instructions is not None: update_data['instructions'] = instructions
+        if amount_left is not None: update_data['amount_left'] = amount_left
+        if refill_threshold is not None: update_data['refill_threshold'] = refill_threshold
+        if treatment_duration_days is not None: update_data['treatment_duration_days'] = treatment_duration_days
+        
+        if update_data:
+            Medication.objects.filter(pk=medication_id).update(**update_data)
 
 
 class ScheduleDAO:
@@ -107,7 +114,7 @@ class DoseLogDAO:
             .filter(status='pending')
             .order_by('scheduled_datetime')
             .annotate(name=F('medication__name'))
-            .values('log_id', 'name', 'scheduled_datetime', 'scheduled_strength', 'scheduled_quantity', 'notes'))
+            .values('log_id', 'medication_id', 'name', 'scheduled_datetime', 'scheduled_strength', 'scheduled_quantity', 'notes'))
 
     @staticmethod
     def get_logs_for_date(target_date):
@@ -116,7 +123,7 @@ class DoseLogDAO:
             .filter(scheduled_datetime__date=target_date)
             .order_by('scheduled_datetime')
             .annotate(name=F('medication__name'))
-            .values('log_id', 'name', 'scheduled_datetime', 'status', 'scheduled_strength', 'scheduled_quantity', 'notes'))
+            .values('log_id', 'medication_id', 'name', 'scheduled_datetime', 'status', 'scheduled_strength', 'scheduled_quantity', 'notes'))
 
     @staticmethod
     def mark_as_taken(log_id, actual_datetime_taken, actual_strength, actual_quantity):
