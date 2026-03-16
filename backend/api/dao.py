@@ -1,230 +1,179 @@
-from django.db import connection
-
-def _map_results(cursor):
-    """Helper function to map raw SQL tuples into Python dictionaries."""
-    columns = [col[0] for col in cursor.description]
-    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+from django.db.models import F
+from .models import Medication, Schedule, DoseLog
 
 class MedicationDAO:
 
     @staticmethod
     def get_all():
-        query = "SELECT * FROM medications ORDER BY name ASC;"
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-            return _map_results(cursor)
+        return list(Medication.objects.all().order_by('name').values())
 
     @staticmethod
     def get_by_id(medication_id):
-        query = "SELECT * FROM medications WHERE medication_id = %s;"
-        with connection.cursor() as cursor:
-            cursor.execute(query, [medication_id])
-            results = _map_results(cursor)
-            return results[0] if results else None
+        return Medication.objects.filter(pk=medication_id).values().first()
 
     @staticmethod
     def update(medication_id, amount_left, is_active):
         """Example update focusing on inventory and status."""
-        query = """
-            UPDATE medications 
-            SET amount_left = %s, is_active = %s
-            WHERE medication_id = %s;
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, [amount_left, is_active, medication_id])
+        Medication.objects.filter(pk=medication_id).update(
+            amount_left=amount_left, 
+            is_active=is_active
+        )
             
     @staticmethod
     def delete(medication_id):
-        query = "DELETE FROM medications WHERE medication_id = %s;"
-        with connection.cursor() as cursor:
-            cursor.execute(query, [medication_id])
+        Medication.objects.filter(pk=medication_id).delete()
     
     @staticmethod
     def create(name, med_type, strength, condition_treated, instructions, amount_left, refill_threshold, previous_medication_id=None, is_active=True):
-        query = """
-            INSERT INTO medications (name, medication_type, strength, condition_treated, instructions, amount_left, refill_threshold, previous_medication_id, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING medication_id;
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, [name, med_type, strength, condition_treated, instructions, amount_left, refill_threshold, previous_medication_id, is_active])
-            return cursor.fetchone()[0]
+        med = Medication.objects.create(
+            name=name,
+            medication_type=med_type,
+            strength=strength,
+            condition_treated=condition_treated,
+            instructions=instructions,
+            amount_left=amount_left,
+            refill_threshold=refill_threshold,
+            previous_medication_id=previous_medication_id,
+            is_active=is_active
+        )
+        return med.medication_id
 
     @staticmethod
     def update_details(medication_id, strength, condition_treated, instructions):
-        query = """
-            UPDATE medications 
-            SET strength = %s, condition_treated = %s, instructions = %s
-            WHERE medication_id = %s;
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, [strength, condition_treated, instructions, medication_id])
+        Medication.objects.filter(pk=medication_id).update(
+            strength=strength, 
+            condition_treated=condition_treated, 
+            instructions=instructions
+        )
 
 
 class ScheduleDAO:
 
     @staticmethod
     def get_all():
-        query = "SELECT * FROM schedules;"
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-            return _map_results(cursor)
+        return list(Schedule.objects.all().values())
 
     @staticmethod
     def create(medication_id, frequency_type, frequency_value, reminder_times):
-        query = """
-            INSERT INTO schedules (medication_id, frequency_type, frequency_value, reminder_times)
-            VALUES (%s, %s, %s, %s)
-            RETURNING schedule_id;
-        """
-        with connection.cursor() as cursor:
-            # psycopg2 automatically handles Python lists to PostgreSQL ARRAYs
-            cursor.execute(query, [medication_id, frequency_type, frequency_value, reminder_times])
-            return cursor.fetchone()[0]
+        sched = Schedule.objects.create(
+            medication_id=medication_id,
+            frequency_type=frequency_type,
+            frequency_value=frequency_value,
+            reminder_times=reminder_times
+        )
+        return sched.schedule_id
 
     @staticmethod
     def get_for_medication(medication_id):
-        query = "SELECT * FROM schedules WHERE medication_id = %s;"
-        with connection.cursor() as cursor:
-            cursor.execute(query, [medication_id])
-            return _map_results(cursor)
+        return list(Schedule.objects.filter(medication_id=medication_id).values())
 
     @staticmethod
     def update(schedule_id, frequency_type, reminder_times):
-        query = """
-            UPDATE schedules 
-            SET frequency_type = %s, reminder_times = %s
-            WHERE schedule_id = %s;
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, [frequency_type, reminder_times, schedule_id])
+        Schedule.objects.filter(pk=schedule_id).update(
+            frequency_type=frequency_type, 
+            reminder_times=reminder_times
+        )
 
     @staticmethod
     def delete(schedule_id):
-        query = "DELETE FROM schedules WHERE schedule_id = %s;"
-        with connection.cursor() as cursor:
-            cursor.execute(query, [schedule_id])
+        Schedule.objects.filter(pk=schedule_id).delete()
 
 
 class DoseLogDAO:
 
     @staticmethod
     def create(medication_id, scheduled_datetime, scheduled_strength, scheduled_quantity):
-        query = """
-            INSERT INTO dose_logs (medication_id, scheduled_datetime, scheduled_strength, scheduled_quantity, status)
-            VALUES (%s, %s, %s, %s, 'pending')
-            RETURNING log_id;
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, [medication_id, scheduled_datetime, scheduled_strength, scheduled_quantity])
-            return cursor.fetchone()[0]
+        log = DoseLog.objects.create(
+            medication_id=medication_id,
+            scheduled_datetime=scheduled_datetime,
+            scheduled_strength=scheduled_strength,
+            scheduled_quantity=scheduled_quantity,
+            status='pending'
+        )
+        return log.log_id
 
     @staticmethod
     def get_pending_logs():
         """A JOIN query to get pending doses along with the medication name."""
-        query = """
-            SELECT d.log_id, m.name, d.scheduled_datetime, d.scheduled_strength, d.scheduled_quantity, d.notes
-            FROM dose_logs d
-            JOIN medications m ON d.medication_id = m.medication_id
-            WHERE d.status = 'pending'
-            ORDER BY d.scheduled_datetime ASC;
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-            return _map_results(cursor)
+        return list(DoseLog.objects.select_related('medication')
+            .filter(status='pending')
+            .order_by('scheduled_datetime')
+            .annotate(name=F('medication__name'))
+            .values('log_id', 'name', 'scheduled_datetime', 'scheduled_strength', 'scheduled_quantity', 'notes'))
 
     @staticmethod
     def get_logs_for_date(target_date):
         """Fetches all dose logs for a specific date, joining the medication name."""
-        query = """
-            SELECT d.log_id, m.name, d.scheduled_datetime, d.status, d.scheduled_strength, d.scheduled_quantity, d.notes
-            FROM dose_logs d
-            JOIN medications m ON d.medication_id = m.medication_id
-            WHERE DATE(d.scheduled_datetime AT TIME ZONE 'UTC') = %s
-            ORDER BY d.scheduled_datetime ASC;
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, [target_date])
-            # Uses the _map_results helper function we created earlier
-            return _map_results(cursor)
+        return list(DoseLog.objects.select_related('medication')
+            .filter(scheduled_datetime__date=target_date)
+            .order_by('scheduled_datetime')
+            .annotate(name=F('medication__name'))
+            .values('log_id', 'name', 'scheduled_datetime', 'status', 'scheduled_strength', 'scheduled_quantity', 'notes'))
 
     @staticmethod
     def mark_as_taken(log_id, actual_datetime_taken, actual_strength, actual_quantity):
-        query = """
-            UPDATE dose_logs 
-            SET status = 'taken', 
-                actual_datetime_taken = %s, 
-                actual_strength_taken = %s, 
-                actual_quantity_taken = %s
-            WHERE log_id = %s;
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, [actual_datetime_taken, actual_strength, actual_quantity, log_id])
+        DoseLog.objects.filter(pk=log_id).update(
+            status='taken',
+            actual_datetime_taken=actual_datetime_taken,
+            actual_strength_taken=actual_strength,
+            actual_quantity_taken=actual_quantity
+        )
 
     @staticmethod
     def delete(log_id):
-        query = "DELETE FROM dose_logs WHERE log_id = %s;"
-        with connection.cursor() as cursor:
-            cursor.execute(query, [log_id])
+        DoseLog.objects.filter(pk=log_id).delete()
 
     @staticmethod
     def get_by_id(log_id):
-        query = "SELECT * FROM dose_logs WHERE log_id = %s;"
-        with connection.cursor() as cursor:
-            cursor.execute(query, [log_id])
-            results = _map_results(cursor)
-            return results[0] if results else None
+        return DoseLog.objects.filter(pk=log_id).values().first()
 
     @staticmethod
     def create_ad_hoc(medication_id, actual_datetime_taken, scheduled_strength, actual_quantity):
         """Creates a dose log that is instantly marked as taken."""
-        query = """
-            INSERT INTO dose_logs (medication_id, scheduled_datetime, actual_datetime_taken, scheduled_strength, actual_strength_taken, scheduled_quantity, actual_quantity_taken, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 'taken')
-            RETURNING log_id;
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, [medication_id, actual_datetime_taken, actual_datetime_taken, scheduled_strength, scheduled_strength, actual_quantity, actual_quantity])
-            return cursor.fetchone()[0]
+        log = DoseLog.objects.create(
+            medication_id=medication_id,
+            scheduled_datetime=actual_datetime_taken,
+            actual_datetime_taken=actual_datetime_taken,
+            scheduled_strength=scheduled_strength,
+            actual_strength_taken=scheduled_strength,
+            scheduled_quantity=actual_quantity,
+            actual_quantity_taken=actual_quantity,
+            status='taken'
+        )
+        return log.log_id
 
     @staticmethod
     def update_log_state(log_id, status, actual_datetime_taken=None, actual_quantity_taken=None):
         """A flexible update method for status changes (skipped, missed, taken, or reverting to pending)."""
-        query = """
-            UPDATE dose_logs 
-            SET status = %s, actual_datetime_taken = %s, actual_quantity_taken = %s
-            WHERE log_id = %s;
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, [status, actual_datetime_taken, actual_quantity_taken, log_id])
+        DoseLog.objects.filter(pk=log_id).update(
+            status=status,
+            actual_datetime_taken=actual_datetime_taken,
+            actual_quantity_taken=actual_quantity_taken
+        )
 
     @staticmethod
     def delete_future_pending(medication_id, current_timestamp):
         """Deletes only pending logs that occur after the given timestamp."""
-        query = """
-            DELETE FROM dose_logs 
-            WHERE medication_id = %s AND status = 'pending' AND scheduled_datetime > %s;
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query, [medication_id, current_timestamp])
+        DoseLog.objects.filter(
+            medication_id=medication_id,
+            status='pending',
+            scheduled_datetime__gt=current_timestamp
+        ).delete()
 
     @staticmethod
     def update_scheduled_datetime(log_id, new_datetime):
         """Updates the scheduled_datetime for a single dose log."""
-        query = "UPDATE dose_logs SET scheduled_datetime = %s WHERE log_id = %s;"
-        with connection.cursor() as cursor:
-            cursor.execute(query, [new_datetime, log_id])
+        DoseLog.objects.filter(pk=log_id).update(scheduled_datetime=new_datetime)
 
     @staticmethod
     def update_dose_details(log_id, new_strength, new_quantity):
         """Updates the scheduled strength and quantity for a single dose log."""
-        query = "UPDATE dose_logs SET scheduled_strength = %s, scheduled_quantity = %s WHERE log_id = %s;"
-        with connection.cursor() as cursor:
-            cursor.execute(query, [new_strength, new_quantity, log_id])
+        DoseLog.objects.filter(pk=log_id).update(
+            scheduled_strength=new_strength, 
+            scheduled_quantity=new_quantity
+        )
 
     @staticmethod
     def update_log_notes(log_id, notes):
         """Updates the notes for a single dose log."""
-        query = "UPDATE dose_logs SET notes = %s WHERE log_id = %s;"
-        with connection.cursor() as cursor:
-            cursor.execute(query, [notes, log_id])
+        DoseLog.objects.filter(pk=log_id).update(notes=notes)
