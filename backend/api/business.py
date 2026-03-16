@@ -84,7 +84,7 @@ class MedicationBusiness:
         )
 
         # 3. Delete future pending logs for the old medication
-        DoseLogDAO.delete_future_pending(medication_id, datetime.now())
+        DoseLogDAO.delete_future_non_taken(medication_id, datetime.now())
 
         # 4. Trigger log generation for the new medication
         DoseLogBusiness.generate_upcoming_schedule(new_med_id)
@@ -97,7 +97,7 @@ class MedicationBusiness:
         med = MedicationDAO.get_by_id(medication_id)
         if med:
             MedicationDAO.update(medication_id, med['amount_left'], is_active=False)
-            DoseLogDAO.delete_future_pending(medication_id, datetime.now())
+            DoseLogDAO.delete_future_non_taken(medication_id, datetime.now())
 
     @staticmethod
     def purge_medication(medication_id: str):
@@ -168,20 +168,28 @@ class ScheduleBusiness:
 
     @staticmethod
     def update_schedule(schedule_id: str, schedule_data: dict):
-        """Updates an existing schedule."""
-        # This assumes we might also want to regenerate logs after an update.
-        # For now, it just updates the schedule itself.
+        """Updates an existing schedule and cleans up future pending doses."""
         ScheduleDAO.update(
             schedule_id,
-            schedule_data['frequency_type'],
-            schedule_data['reminder_times']
+            schedule_data.get('frequency_type'),
+            schedule_data.get('reminder_times')
         )
+
+        # Purge future doses not explicitly marked as 'taken'
+        # If PATCH payload doesn't include the ID, you may need to fetch it first via ScheduleDAO.get_by_id
+        medication_id = schedule_data.get('medication_id')
+        
+        if medication_id:
+            DoseLogDAO.delete_future_non_taken(medication_id, datetime.now())
+            
+            # Regenerate the base upcoming schedule
+            DoseLogBusiness.generate_upcoming_schedule(medication_id)
     
     @staticmethod
     def remove_schedule(schedule_id: str, medication_id: str):
         """Deletes a schedule and its future pending logs."""
         ScheduleDAO.delete(schedule_id)
-        DoseLogDAO.delete_future_pending(medication_id, datetime.now())
+        DoseLogDAO.delete_future_non_taken(medication_id, datetime.now())
 
 
 class DoseLogBusiness:
@@ -191,6 +199,32 @@ class DoseLogBusiness:
     def get_daily_planned_doses(target_date: str) -> list:
         """Fetches all dose logs for a specific date, sorted chronologically."""
         return DoseLogDAO.get_logs_for_date(target_date)
+
+    @staticmethod
+    def get_weekly_planned_doses(start_date: str) -> list:
+        """
+        Fetches dose logs for a 7-day period starting from start_date.
+        Automatically generates future doses if they don't exist yet.
+        """
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
+        today = datetime.now().date()
+        
+        active_meds = MedicationBusiness.get_active_inventory()
+        weekly_logs = []
+        
+        for i in range(7):
+            target_dt = start_dt + timedelta(days=i)
+            target_date_str = target_dt.strftime("%Y-%m-%d")
+            
+            # If viewing today or the future, trigger lazy generation
+            if target_dt >= today:
+                for med in active_meds:
+                    DoseLogBusiness._generate_schedule_for_date(med['medication_id'], target_dt, med=med)
+            
+            # Append logs for this date
+            weekly_logs.extend(DoseLogDAO.get_logs_for_date(target_date_str))
+            
+        return weekly_logs
 
     @staticmethod
     def get_dose_log_by_id(log_id: str) -> dict:
@@ -293,22 +327,43 @@ class DoseLogBusiness:
 
         today = datetime.now().date()
         
-        for schedule in schedules:
-            # Check treatment duration if it exists
-            if med.get('treatment_duration_days'):
-                # This assumes a start date, which is not in the schema.
-                # A more robust implementation would need a `treatment_start_date`.
-                # For now, we'll just use a placeholder for the logic.
-                pass
-            
-            for i in range(days_ahead):
-                target_date = today + timedelta(days=i)
-                
-                # Logic for different frequency types
-                if schedule['frequency_type'] == 'daily':
-                    for t in schedule['reminder_times']:
-                        dt = datetime.combine(target_date, t)
-                        DoseLogDAO.create(medication_id, dt, med['strength'], 1) # Assuming quantity 1
+        # Check treatment duration if it exists
+        if med.get('treatment_duration_days'):
+            # This assumes a start date, which is not in the schema.
+            # A more robust implementation would need a `treatment_start_date`.
+            # For now, we'll just use a placeholder for the logic.
+            pass
+        
+        for i in range(days_ahead):
+            target_date = today + timedelta(days=i)
+            DoseLogBusiness._generate_schedule_for_date(medication_id, target_date, schedules=schedules, med=med)
+
+    @staticmethod
+    def _generate_schedule_for_date(medication_id: str, target_date: datetime.date, schedules: list = None, med: dict = None):
+        """Helper to safely generate missing dose logs for a specific date without duplicating."""
+        if not med:
+            med = MedicationDAO.get_by_id(medication_id)
+        if not med or not med['is_active']:
+            return
+
+        if not schedules:
+            schedules = ScheduleDAO.get_for_medication(medication_id)
+
+        # Fetch existing scheduled datetimes to prevent duplicate generation
+        date_str = target_date.strftime("%Y-%m-%d")
+        existing_logs = DoseLogDAO.get_logs_for_date(date_str)
+        existing_dts = {
+            log['scheduled_datetime'].replace(tzinfo=None) 
+            for log in existing_logs 
+            if log['medication_id'] == medication_id and log.get('scheduled_datetime')
+        }
+
+        for sched in schedules:
+            if sched['frequency_type'] == 'daily':
+                for t in sched['reminder_times']:
+                    dt = datetime.combine(target_date, t)
+                    if dt not in existing_dts:
+                        DoseLogDAO.create(medication_id, dt, med['strength'], 1)
     
     @staticmethod
     def sweep_expired_doses():

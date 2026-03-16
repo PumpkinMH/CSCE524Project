@@ -155,11 +155,19 @@ class ScheduleDetailView(APIView):
     """
     Update or delete a schedule.
     PUT: /api/schedules/<uuid:schedule_id>/
+    PATCH: /api/schedules/<uuid:schedule_id>/
     DELETE: /api/schedules/<uuid:schedule_id>/
     """
     def put(self, request, schedule_id: uuid.UUID):
         serializer = serializers.ScheduleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        ScheduleBusiness.update_schedule(str(schedule_id), serializer.validated_data)
+        return Response({'status': 'schedule updated'}, status=status.HTTP_200_OK)
+
+    def patch(self, request, schedule_id: uuid.UUID):
+        serializer = serializers.ScheduleSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        
         ScheduleBusiness.update_schedule(str(schedule_id), serializer.validated_data)
         return Response({'status': 'schedule updated'}, status=status.HTTP_200_OK)
 

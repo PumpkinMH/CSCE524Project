@@ -68,11 +68,19 @@ class ScheduleDAO:
         return list(Schedule.objects.filter(medication_id=medication_id).values())
 
     @staticmethod
-    def update(schedule_id, frequency_type, reminder_times):
-        Schedule.objects.filter(pk=schedule_id).update(
-            frequency_type=frequency_type, 
-            reminder_times=reminder_times
-        )
+    def get_by_id(schedule_id):
+        return Schedule.objects.filter(pk=schedule_id).values().first()
+
+    @staticmethod
+    def update(schedule_id, frequency_type=None, reminder_times=None):
+        update_data = {}
+        if frequency_type is not None:
+            update_data['frequency_type'] = frequency_type
+        if reminder_times is not None:
+            update_data['reminder_times'] = reminder_times
+            
+        if update_data:
+            Schedule.objects.filter(pk=schedule_id).update(**update_data)
 
     @staticmethod
     def delete(schedule_id):
@@ -152,13 +160,12 @@ class DoseLogDAO:
         )
 
     @staticmethod
-    def delete_future_pending(medication_id, current_timestamp):
-        """Deletes only pending logs that occur after the given timestamp."""
+    def delete_future_non_taken(medication_id, current_timestamp):
+        """Deletes future logs that are not explicitly marked as taken."""
         DoseLog.objects.filter(
             medication_id=medication_id,
-            status='pending',
             scheduled_datetime__gt=current_timestamp
-        ).delete()
+        ).exclude(status='taken').delete()
 
     @staticmethod
     def update_scheduled_datetime(log_id, new_datetime):
