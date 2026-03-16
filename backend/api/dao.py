@@ -116,7 +116,7 @@ class DoseLogDAO:
     def get_pending_logs():
         """A JOIN query to get pending doses along with the medication name."""
         query = """
-            SELECT d.log_id, m.name, d.scheduled_datetime, d.scheduled_strength 
+            SELECT d.log_id, m.name, d.scheduled_datetime, d.scheduled_strength, d.scheduled_quantity, d.notes
             FROM dose_logs d
             JOIN medications m ON d.medication_id = m.medication_id
             WHERE d.status = 'pending'
@@ -130,7 +130,7 @@ class DoseLogDAO:
     def get_logs_for_date(target_date):
         """Fetches all dose logs for a specific date, joining the medication name."""
         query = """
-            SELECT d.log_id, m.name, d.scheduled_datetime, d.status 
+            SELECT d.log_id, m.name, d.scheduled_datetime, d.status, d.scheduled_strength, d.scheduled_quantity, d.notes
             FROM dose_logs d
             JOIN medications m ON d.medication_id = m.medication_id
             WHERE DATE(d.scheduled_datetime AT TIME ZONE 'UTC') = %s

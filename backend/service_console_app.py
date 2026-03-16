@@ -223,11 +223,12 @@ def doselog_menu():
         print("5. Reschedule Single Dose")
         print("6. Modify Single Dose Details")
         print("7. Revert/Update Dose Status")
-        print("8. Generate Upcoming Schedule (Manual Trigger)")
-        print("9. Sweep Expired Doses")
-        print("10. Back to Main Menu")
+        print("8. Delete Dose Log") # New option
+        print("9. Generate Upcoming Schedule (Manual Trigger)") # Shifted
+        print("10. Sweep Expired Doses") # Shifted
+        print("11. Back to Main Menu") # Shifted
         
-        choice = input("\nSelect an option (1-10): ")
+        choice = input("\nSelect an option (1-11): ") # Updated range
         
         if choice == '1':
             date_str = input_prompt("Date (YYYY-MM-DD)*: ", required=True)
@@ -236,7 +237,7 @@ def doselog_menu():
                 if not logs:
                     print("  No logs found for this date.")
                 for log in logs:
-                    print(f"  [{log['log_id']}] {log['scheduled_datetime']} - {log['name']} - Status: {log['status']}")
+                    print(f"  [{log['log_id']}] {log['scheduled_datetime']} - {log['name']} - Strength: {log.get('scheduled_strength', 'N/A')}, Quantity: {log.get('scheduled_quantity', 'N/A')} - Status: {log['status']} - Notes: {log.get('notes', 'N/A')}")
                 
         elif choice == '2':
             log_id = input_prompt("Log ID*: ", required=True)
@@ -294,18 +295,27 @@ def doselog_menu():
             if make_request('PATCH', f'/doses/{log_id}/status/', data=data):
                 print("  -> Dose status updated.")
                 
-        elif choice == '8':
+        elif choice == '8': # New logic for deleting a dose log
+            print("\n-- Delete Dose Log --")
+            log_id = input_prompt("Log ID to delete*: ", required=True)
+            confirm = input_prompt("Are you sure you want to permanently delete this dose log? (y/N): ", default="n")
+            if confirm.lower() == 'y':
+                if make_request('DELETE', f'/doses/{log_id}/'):
+                    print("  -> Dose log permanently deleted.")
+            else:
+                print("  -> Dose log deletion cancelled.")
+        elif choice == '9': # Shifted from 8 to 9
             med_id = input_prompt("Medication ID*: ", required=True)
             days = input_prompt("Days Ahead (default 30): ", default=30, type_func=int)
             
             if make_request('POST', f'/medications/{med_id}/generate-schedule/', data={'days_ahead': days}):
                 print(f"  -> Successfully triggered generation for {days} days of logs.")
                 
-        elif choice == '9':
+        elif choice == '10': # Shifted from 9 to 10
             if make_request('POST', '/doses/sweep-expired/'):
                 print("  -> Expired pending doses swept and marked as 'missed'.")
 
-        elif choice == '10':
+        elif choice == '11': # Shifted from 10 to 11
             break
 
 def main():

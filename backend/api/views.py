@@ -181,6 +181,29 @@ class DailyDoseView(APIView):
         return Response(doses, status=status.HTTP_200_OK)
 
 @method_decorator(_api_error_handler, name='dispatch')
+class DoseLogDetailView(APIView):
+    """
+    Retrieve, modify, or delete a specific dose log.
+    GET: /api/doses/<uuid:log_id>/
+    PATCH: /api/doses/<uuid:log_id>/
+    DELETE: /api/doses/<uuid:log_id>/
+    """
+    def get(self, request, log_id: uuid.UUID):
+        log = DoseLogBusiness.get_dose_log_by_id(str(log_id))
+        return Response(log, status=status.HTTP_200_OK)
+
+    def patch(self, request, log_id: uuid.UUID):
+        serializer = serializers.DoseLogModifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        DoseLogBusiness.modify_single_dose(str(log_id), serializer.validated_data['new_strength'], serializer.validated_data['new_quantity'])
+        return Response({'status': 'dose details modified'}, status=status.HTTP_200_OK)
+
+    def delete(self, request, log_id: uuid.UUID):
+        DoseLogBusiness.delete_dose_log(str(log_id))
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+@method_decorator(_api_error_handler, name='dispatch')
 class DoseLogTakeView(APIView):
     """
     Mark a dose as taken.
@@ -217,18 +240,6 @@ class DoseLogRescheduleView(APIView):
         return Response({'status': 'dose rescheduled'}, status=status.HTTP_200_OK)
 
 @method_decorator(_api_error_handler, name='dispatch')
-class DoseLogModifyView(APIView):
-    """
-    Modify a single dose's details.
-    PATCH: /api/doses/<uuid:log_id>/
-    """
-    def patch(self, request, log_id: uuid.UUID):
-        serializer = serializers.DoseLogModifySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        DoseLogBusiness.modify_single_dose(str(log_id), serializer.validated_data['new_strength'], serializer.validated_data['new_quantity'])
-        return Response({'status': 'dose details modified'}, status=status.HTTP_200_OK)
-
 @method_decorator(_api_error_handler, name='dispatch')
 class AdHocDoseCreateView(APIView):
     """

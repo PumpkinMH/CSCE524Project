@@ -188,6 +188,18 @@ class DoseLogBusiness:
         return DoseLogDAO.get_logs_for_date(target_date)
 
     @staticmethod
+    def get_dose_log_by_id(log_id: str) -> dict:
+        """Fetches a single dose log by its ID."""
+        log = DoseLogDAO.get_by_id(log_id)
+        if not log:
+            raise ValueError(f"Dose log with ID {log_id} not found.")
+        return log
+
+    @staticmethod
+    def delete_dose_log(log_id: str):
+        DoseLogDAO.delete(log_id)
+
+    @staticmethod
     def log_dose_as_taken(log_id: str):
         """
         Marks a dose as taken and deducts the quantity from the medication inventory.
@@ -210,7 +222,7 @@ class DoseLogBusiness:
             log_id, 
             'taken',
             actual_datetime_taken=datetime.now(),
-            actual_quantity_taken=quantity_taken
+            actual_quantity_taken=quantity_taken_decimal
         )
 
         # Update inventory, flooring at 0
