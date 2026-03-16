@@ -10,6 +10,7 @@ database implementation.
 
 from datetime import datetime, timedelta, time
 from .dao import MedicationDAO, ScheduleDAO, DoseLogDAO
+from decimal import Decimal
 
 class MedicationBusiness:
     """Handles business logic related to medications."""
@@ -27,7 +28,10 @@ class MedicationBusiness:
         """
         if not medication_data.get('name'):
             raise ValueError("Medication name cannot be empty.")
-        if float(medication_data.get('amount_left', 0)) < 0 or float(medication_data.get('refill_threshold', 0)) < 0:
+        
+        # Convert to Decimal for validation and consistency
+        if Decimal(str(medication_data.get('amount_left', 0))) < 0 or \
+           Decimal(str(medication_data.get('refill_threshold', 0))) < 0:
             raise ValueError("Amounts and thresholds must be non-negative.")
 
         med_id = MedicationDAO.create(
@@ -122,7 +126,9 @@ class MedicationBusiness:
             raise ValueError("Amount to add must be positive.")
         med = MedicationDAO.get_by_id(medication_id)
         if med:
-            new_amount = med['amount_left'] + amount_added
+            # Ensure all arithmetic is done with Decimal
+            current_amount = med['amount_left'] if med['amount_left'] is not None else Decimal('0')
+            new_amount = current_amount + Decimal(str(amount_added))
             MedicationDAO.update(medication_id, new_amount, med['is_active'])
 
 
@@ -196,8 +202,9 @@ class DoseLogBusiness:
         if not med:
             raise ValueError("Associated medication not found.")
 
-        quantity_taken = log['scheduled_quantity']
-        
+        # Ensure quantity_taken is Decimal for calculations
+        quantity_taken_decimal = Decimal(str(log['scheduled_quantity']))
+
         # Update log status
         DoseLogDAO.update_log_state(
             log_id, 
@@ -207,7 +214,8 @@ class DoseLogBusiness:
         )
 
         # Update inventory, flooring at 0
-        new_amount = max(0, med['amount_left'] - quantity_taken)
+        current_amount = med['amount_left'] if med['amount_left'] is not None else Decimal('0')
+        new_amount = max(Decimal('0'), current_amount - quantity_taken_decimal)
         MedicationDAO.update(med['medication_id'], new_amount, med['is_active'])
 
     @staticmethod
@@ -228,8 +236,9 @@ class DoseLogBusiness:
         DoseLogDAO.update_dose_details(log_id, new_strength, new_quantity)
 
     @staticmethod
-    def add_ad_hoc_dose(medication_id: str, quantity: float, strength: str = None):
-        """Instantly logs a dose as taken and deducts from inventory."""
+    def add_ad_hoc_dose(medication_id: str, quantity: float, strength: str = None) -> dict:
+        """Instantly logs a dose as taken and deducts from inventory.
+        Quantity is expected as float from serializer, converted to Decimal for calculations."""
         med = MedicationDAO.get_by_id(medication_id)
         if not med:
             raise ValueError("Medication not found.")
@@ -237,16 +246,23 @@ class DoseLogBusiness:
         # Use medication's default strength if not provided
         actual_strength = strength if strength else med['strength']
 
-        DoseLogDAO.create_ad_hoc(
+        # Convert float quantity to Decimal for precise storage and calculation
+        quantity_decimal = Decimal(str(quantity))
+
+        log_id = DoseLogDAO.create_ad_hoc(
             medication_id,
             datetime.now(),
             actual_strength,
-            quantity
+            quantity_decimal
         )
-        
+
         # Deduct from inventory, flooring at 0
-        new_amount = max(0, med['amount_left'] - quantity)
+        current_amount = med['amount_left'] if med['amount_left'] is not None else Decimal('0')
+        new_amount = max(Decimal('0'), current_amount - quantity_decimal)
         MedicationDAO.update(medication_id, new_amount, med['is_active'])
+
+        # Return the newly created object, which is RESTful best practice.
+        return DoseLogDAO.get_by_id(log_id)
 
     @staticmethod
     def generate_upcoming_schedule(medication_id: str, days_ahead: int = 30):
@@ -295,39 +311,43 @@ class DoseLogBusiness:
         if not log:
             raise ValueError("Log not found.")
         
+        # Ensure all quantities are Decimals for consistent arithmetic
         old_status = log['status']
-        old_quantity = log.get('actual_quantity_taken', 0)
+        old_quantity_decimal = Decimal(str(log.get('actual_quantity_taken', 0)))
+        new_quantity_decimal = Decimal(str(new_quantity)) if new_quantity is not None else None
+        scheduled_quantity_decimal = Decimal(str(log['scheduled_quantity']))
         
         # No change, no action
-        if old_status == new_status and (new_quantity is None or old_quantity == new_quantity):
+        if old_status == new_status and (new_quantity_decimal is None or old_quantity_decimal == new_quantity_decimal):
             return
 
         med = MedicationDAO.get_by_id(log['medication_id'])
         if not med:
             raise ValueError("Medication not found.")
 
-        inventory_change = 0
+        inventory_change = Decimal('0')
+        current_med_amount = med['amount_left'] if med['amount_left'] is not None else Decimal('0')
 
         # Case 1: Reverting a 'taken' dose
         if old_status == 'taken' and new_status in ('pending', 'skipped'):
-            inventory_change = old_quantity # Add back to inventory
+            inventory_change = old_quantity_decimal # Add back to inventory
             DoseLogDAO.update_log_state(log_id, new_status, actual_quantity_taken=None, actual_datetime_taken=None)
 
         # Case 2: Changing a non-taken dose to 'taken'
         elif old_status in ('pending', 'skipped', 'missed') and new_status == 'taken':
-            quantity_to_log = new_quantity if new_quantity is not None else log['scheduled_quantity']
-            inventory_change = -quantity_to_log # Deduct from inventory
-            DoseLogDAO.update_log_state(log_id, new_status, actual_quantity_taken=quantity_to_log, actual_datetime_taken=datetime.now())
+            quantity_to_log = new_quantity_decimal if new_quantity_decimal is not None else scheduled_quantity_decimal
+            inventory_change = -quantity_to_log # Deduct from inventory (negative value)
+            DoseLogDAO.update_log_state(log_id, new_status, actual_quantity_taken=quantity_to_log, actual_datetime_taken=datetime.now()) # Pass Decimal
 
         # Case 3: Modifying an already 'taken' dose's quantity
-        elif old_status == 'taken' and new_status == 'taken' and new_quantity is not None:
-            inventory_change = old_quantity - new_quantity # Adjust by the difference
-            DoseLogDAO.update_log_state(log_id, new_status, actual_quantity_taken=new_quantity, actual_datetime_taken=log['actual_datetime_taken'])
+        elif old_status == 'taken' and new_status == 'taken' and new_quantity_decimal is not None:
+            inventory_change = old_quantity_decimal - new_quantity_decimal # Adjust by the difference
+            DoseLogDAO.update_log_state(log_id, new_status, actual_quantity_taken=new_quantity_decimal, actual_datetime_taken=log['actual_datetime_taken']) # Pass Decimal
 
         # Apply inventory change
-        if inventory_change != 0:
-            new_amount = med['amount_left'] + inventory_change
+        if inventory_change != Decimal('0'):
+            new_amount = current_med_amount + inventory_change
             # Ensure inventory doesn't go negative on a deduction
-            if inventory_change < 0:
-                new_amount = max(0, new_amount)
+            if inventory_change < Decimal('0'):
+                new_amount = max(Decimal('0'), new_amount)
             MedicationDAO.update(med['medication_id'], new_amount, med['is_active'])

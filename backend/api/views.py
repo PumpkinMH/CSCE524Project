@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 from django.utils.decorators import method_decorator
 from rest_framework.exceptions import APIException
+from django.http import JsonResponse
 
 def _api_error_handler(func):
     """Decorator for APIView dispatch method to handle common exceptions."""
@@ -14,15 +15,17 @@ def _api_error_handler(func):
         try:
             return func(*args, **kwargs)
         except ValueError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return JsonResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except APIException as e:
             # Catch DRF-specific exceptions (like ValidationErrors) to return clean JSON
-            return Response({'error': e.detail}, status=e.status_code)
+            error_data = e.detail if isinstance(e.detail, dict) else {'error': str(e.detail)}
+            return JsonResponse(error_data, status=e.status_code)
         except Exception as e:
             # In a real app, you'd want to log this exception.
             # import logging
             # logging.exception("An unexpected error occurred")
-            return Response({'error': 'An unexpected server error occurred.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Exposing str(e) so your console actually tells you what went wrong instead of generic 500
+            return JsonResponse({'error': f'An unexpected server error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     return wrapper
 
 # === Medication Views ===
@@ -235,13 +238,14 @@ class AdHocDoseCreateView(APIView):
     def post(self, request):
         serializer = serializers.AdHocDoseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
-        DoseLogBusiness.add_ad_hoc_dose(
+
+        new_dose = DoseLogBusiness.add_ad_hoc_dose(
             str(serializer.validated_data['medication_id']), 
             serializer.validated_data['quantity'], 
             serializer.validated_data.get('strength')
         )
-        return Response({'status': 'ad-hoc dose created'}, status=status.HTTP_201_CREATED)
+        # Return the newly created object, which is a RESTful best practice.
+        return Response(new_dose, status=status.HTTP_201_CREATED)
 
 @method_decorator(_api_error_handler, name='dispatch')
 class DoseSweepExpiredView(APIView):
