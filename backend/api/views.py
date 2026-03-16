@@ -135,9 +135,14 @@ class MedicationGenerateScheduleView(APIView):
 @method_decorator(_api_error_handler, name='dispatch')
 class ScheduleListCreateView(APIView):
     """
-    Create a new schedule.
+    List all schedules or create a new schedule.
+    GET: /api/schedules/
     POST: /api/schedules/
     """
+    def get(self, request):
+        schedules = ScheduleBusiness.get_all_schedules()
+        return Response(schedules, status=status.HTTP_200_OK)
+
     def post(self, request):
         serializer = serializers.ScheduleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

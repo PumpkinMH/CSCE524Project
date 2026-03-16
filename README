@@ -1,0 +1,21 @@
+Database Setup (Render)
+Create Postgres Instance: Log in to Render, click New +, and select PostgreSQL. Name your database and select the Free Tier.
+Local Connection: Once the database is Available, find the External Database URL.
+Run Scripts: Use your preferred SQL tool, or psql in the terminal, to connect to the Render instance using that External URL. Run your create_db.sql and fill_db.sql scripts to build the schema and seed data.
+
+Prepare Settings.py
+Before pushing your code to GitHub, you must ensure Django is configured for the cloud environment.
+Comment Out Local Database: In backend/medtracker/settings.py, comment out your local SQLite or local Postgres configuration.
+Uncomment Production Database: Ensure the code using dj_database_url is active. You will need to import dj_database_url and os at the top. Set the DATABASES default to dj_database_url.config using the DATABASE_URL environment variable and set conn_max_age to 0.
+Internal Pathing: Ensure ALLOWED_HOSTS includes your Render domain, such as https://www.google.com/search?q=csce524project.onrender.com, as well as localhost.
+
+Web Service Configuration (Render)
+Create Web Service: Click New +, select Web Service, and connect your GitHub repository.
+Environment Variables: Go to the Environment tab. Add a variable named DATABASE_URL. Paste the Internal Database URL from your Render Postgres dashboard, not the External one.
+Start Command: Under Settings, update the Start Command to: gunicorn --chdir backend --bind 0.0.0.0:$PORT medtracker.wsgi
+
+Update Client Application
+To test the live deployment, you must point your local console app to the cloud.
+Change URL: Open service_console_app.py.
+Update Base URL: Replace http://localhost:8000/api with your live Render URL, for example: https://csce524project.onrender.com/api/
+Verify: Run the app locally. It should now fetch data from the Render Postgres instance via the Render Web Service.

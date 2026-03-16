@@ -64,6 +64,13 @@ class MedicationDAO:
 class ScheduleDAO:
 
     @staticmethod
+    def get_all():
+        query = "SELECT * FROM schedules;"
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            return _map_results(cursor)
+
+    @staticmethod
     def create(medication_id, frequency_type, frequency_value, reminder_times):
         query = """
             INSERT INTO schedules (medication_id, frequency_type, frequency_value, reminder_times)

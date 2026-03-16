@@ -84,33 +84,35 @@ WSGI_APPLICATION = 'medtracker.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+
+# Comment out this line in order to deploy on Render
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'mabel', # Change to your Beekeeper DB name
+        'USER': 'mabel',           # Change to your PostgreSQL username
+        'PASSWORD': 'Tacking-Oversight-Earache',  # Change to your PostgreSQL password
+        'HOST': 'localhost',
+        'PORT': '5432',               # 5432 is the standard PostgreSQL port
+        'OPTIONS': {
+            'options': '-c search_path=medtracker,public'
+        },
+    }
+}
+# UNCOMMENT THIS LINE TO DEPLOY ON RENDER
 # DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'mabel', # Change to your Beekeeper DB name
-#         'USER': 'mabel',           # Change to your PostgreSQL username
-#         'PASSWORD': 'Tacking-Oversight-Earache',  # Change to your PostgreSQL password
-#         'HOST': 'localhost',
-#         'PORT': '5432',               # 5432 is the standard PostgreSQL port
-#         'OPTIONS': {
-#             'options': '-c search_path=medtracker,public'
-#         },
-#     }
+#     'default': dj_database_url.config(
+#         # This pulls the DATABASE_URL environment variable from Render
+#         default=os.environ.get('DATABASE_URL'),
+#         conn_max_age=0,
+#         conn_health_checks=True,
+#     )
 # }
 
-DATABASES = {
-    'default': dj_database_url.config(
-        # This pulls the DATABASE_URL environment variable from Render
-        default=os.environ.get('DATABASE_URL'),
-        conn_max_age=0,
-        conn_health_checks=True,
-    )
-}
-
-# Add the search path logic back in so your 'medtracker' schema is recognized
-DATABASES['default']['OPTIONS'] = {
-    'options': '-c search_path=medtracker,public'
-}
+# # Add the search path logic back in so your 'medtracker' schema is recognized
+# DATABASES['default']['OPTIONS'] = {
+#     'options': '-c search_path=medtracker,public'
+# }
 
 
 # Password validation

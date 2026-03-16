@@ -1,6 +1,7 @@
 import requests
 from datetime import datetime
 
+# Change this URL to the one that render gives you for the Django server
 BASE_URL = "http://localhost:8000/api"
 
 def print_header(title):
@@ -151,14 +152,26 @@ def medication_menu():
 def schedule_menu():
     while True:
         print_header("SCHEDULE MANAGEMENT (API CLIENT)")
-        print("1. Create Schedule")
-        print("2. Update Schedule")
-        print("3. Remove Schedule")
-        print("4. Back to Main Menu")
+        print("1. View All Schedules")
+        print("2. Create Schedule")
+        print("3. Update Schedule")
+        print("4. Remove Schedule")
+        print("5. Back to Main Menu")
         
-        choice = input("\nSelect an option (1-4): ")
+        choice = input("\nSelect an option (1-5): ")
         
         if choice == '1':
+            schedules = make_request('GET', '/schedules/')
+            if schedules is not None:
+                if not schedules:
+                    print("  No schedules found.")
+                for s in schedules:
+                    freq_val = s.get('frequency_value')
+                    freq_str = f" (Value: {freq_val})" if freq_val else ""
+                    times = ", ".join(s.get('reminder_times', []))
+                    print(f"  [{s.get('schedule_id', s.get('id', 'N/A'))}] Med ID: {s.get('medication_id', 'N/A')} | Freq: {s.get('frequency_type', 'N/A')}{freq_str} | Times: [{times}]")
+                    
+        elif choice == '2':
             print("\n-- Create Schedule --")
             med_id = input_prompt("Medication ID*: ", required=True)
             freq_type = input_prompt("Frequency Type (daily/weekly/interval/specific_days/as_needed)*: ", required=True)
@@ -181,7 +194,7 @@ def schedule_menu():
             except Exception as e:
                 print(f"  -> Error parsing times: {e}")
                 
-        elif choice == '2':
+        elif choice == '3':
             print("\n-- Update Schedule --")
             sched_id = input_prompt("Schedule ID*: ", required=True)
             med_id = input_prompt("Medication ID*: ", required=True)
@@ -199,7 +212,7 @@ def schedule_menu():
             except Exception as e:
                 print(f"  -> Error parsing times: {e}")
                 
-        elif choice == '3':
+        elif choice == '4':
             print("\n-- Remove Schedule --")
             sched_id = input_prompt("Schedule ID*: ", required=True)
             med_id = input_prompt("Medication ID (needed to purge future logs)*: ", required=True)
@@ -207,7 +220,7 @@ def schedule_menu():
             if make_request('DELETE', f'/schedules/{sched_id}/', data={'medication_id': med_id}):
                 print("  -> Schedule and future pending logs removed.")
                 
-        elif choice == '4':
+        elif choice == '5':
             break
 
 # ==========================================

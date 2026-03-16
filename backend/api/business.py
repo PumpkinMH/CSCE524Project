@@ -138,6 +138,11 @@ class ScheduleBusiness:
     ALLOWED_FREQ_TYPES = {'daily', 'weekly', 'interval', 'specific_days', 'as_needed'}
 
     @staticmethod
+    def get_all_schedules() -> list:
+        """Fetches all schedules."""
+        return ScheduleDAO.get_all()
+
+    @staticmethod
     def create_schedule(schedule_data: dict) -> dict:
         """
         Creates a new schedule and generates its initial dose logs.
