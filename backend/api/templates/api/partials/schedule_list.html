@@ -2,9 +2,28 @@
     <h3>All Schedules</h3>
     <ul>
     {% for sched in schedules %}
-        <li>
-            Med ID: {{ sched.medication_id }} | Freq: {{ sched.frequency_type }} | Times: {{ sched.reminder_times|join:", " }}
-            <div class="actions" style="margin-top: 5px;">
+        <li style="margin-bottom: 20px;">
+            <strong>{{ sched.medication_name }}</strong> | Freq: {{ sched.frequency_type|title }} | Times: {{ sched.reminder_times|join:", " }}
+            <div class="actions" style="margin-top: 10px;">
+                <!-- Modify Schedule Form via existing DRF PUT endpoint -->
+                <form hx-put="/api/schedules/{{ sched.schedule_id }}/" hx-swap="none" hx-on:htmx:after-request="location.reload()" style="display:inline-block; border-right: 1px solid #ccc; padding-right: 10px; margin-right: 10px;">
+                    <input type="hidden" name="medication_id" value="{{ sched.medication_id }}">
+                    <select name="frequency_type" required onchange="window.toggleScheduleFields(this)">
+                        <option value="daily" {% if sched.frequency_type == 'daily' %}selected{% endif %}>Daily</option>
+                        <option value="weekly" {% if sched.frequency_type == 'weekly' %}selected{% endif %}>Weekly</option>
+                        <option value="interval" {% if sched.frequency_type == 'interval' %}selected{% endif %}>Interval</option>
+                        <option value="specific_days" {% if sched.frequency_type == 'specific_days' %}selected{% endif %}>Specific Days</option>
+                        <option value="as_needed" {% if sched.frequency_type == 'as_needed' %}selected{% endif %}>As Needed</option>
+                    </select>
+                    <input type="text" name="frequency_value" placeholder="Freq Value" value="{{ sched.frequency_value|default:'' }}" style="width: 100px;">
+                    
+                    <input type="time" name="reminder_times" value="{{ sched.reminder_times.0|default:'' }}">
+                    <input type="time" name="reminder_times" value="{{ sched.reminder_times.1|default:'' }}">
+                    <input type="time" name="reminder_times" value="{{ sched.reminder_times.2|default:'' }}">
+                    
+                    <button type="submit">Update</button>
+                </form>
+
                 <form hx-delete="/api/schedules/{{ sched.schedule_id }}/" hx-swap="none" hx-on:htmx:after-request="location.reload()" style="display:inline;">
                     <input type="hidden" name="medication_id" value="{{ sched.medication_id }}">
                     <button type="submit" style="color: red;">Remove Schedule</button>
@@ -25,14 +44,49 @@
                 <option value="{{ med.medication_id }}">{{ med.name }}</option>
             {% endfor %}
         </select><br/>
-        <select name="frequency_type" required>
+        <select name="frequency_type" required onchange="window.toggleScheduleFields(this)" style="margin: 5px 0;">
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
+            <option value="interval">Interval</option>
+            <option value="specific_days">Specific Days</option>
             <option value="as_needed">As Needed</option>
         </select><br/>
+        <input type="text" name="frequency_value" placeholder="Frequency Value (e.g., '2' for every 2 days)" style="margin: 5px 0;"><br/>
         <label>Reminder Times:</label><br/>
+        <input type="time" name="reminder_times">
         <input type="time" name="reminder_times">
         <input type="time" name="reminder_times"><br/>
         <button type="submit" style="margin-top: 10px;">Create Schedule</button>
     </form>
 </div>
+
+<script>
+    if (typeof window.toggleScheduleFields === 'undefined') {
+        window.toggleScheduleFields = function(selectElem) {
+            var form = selectElem.closest('form');
+            var type = selectElem.value;
+            var freqValue = form.querySelector('input[name="frequency_value"]');
+            var timeInputs = form.querySelectorAll('input[type="time"]');
+            
+            if (freqValue) {
+                if (['interval', 'weekly', 'specific_days'].includes(type)) {
+                    freqValue.style.display = 'inline-block';
+                } else {
+                    freqValue.style.display = 'none';
+                }
+            }
+            
+            if (timeInputs) {
+                if (type === 'as_needed') {
+                    timeInputs.forEach(function(i) { i.style.display = 'none'; });
+                } else {
+                    timeInputs.forEach(function(i) { i.style.display = 'inline-block'; });
+                }
+            }
+        };
+    }
+    
+    document.querySelectorAll('select[name="frequency_type"]').forEach(function(el) {
+        window.toggleScheduleFields(el);
+    });
+</script>

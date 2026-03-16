@@ -1,76 +1,83 @@
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; background: white; padding: 0.5rem 1rem; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-    <button class="mdc-icon-button material-icons" 
-            hx-get="{% url 'ui:daily_doses_tab' %}?date={{ prev_date }}" 
-            hx-target="#content-area">chevron_left</button>
-    
-    <span class="mdc-typography--headline6" style="margin: 0;">{{ display_date }}</span>
-    
-    <button class="mdc-icon-button material-icons" 
-            hx-get="{% url 'ui:daily_doses_tab' %}?date={{ next_date }}" 
-            hx-target="#content-area">chevron_right</button>
-</div>
+<div id="daily-doses-container">
+    <div class="header-controls" style="margin-bottom: 20px;">
+        <button hx-get="{% url 'ui:daily_doses_tab' %}?date={{ prev_date }}" hx-target="#daily-doses-container" hx-swap="outerHTML">Previous Day</button>
+        <span style="font-weight: bold; margin: 0 15px;">{{ display_date }}</span>
+        <button hx-get="{% url 'ui:daily_doses_tab' %}?date={{ next_date }}" hx-target="#daily-doses-container" hx-swap="outerHTML">Next Day</button>
+        <button hx-get="{% url 'ui:daily_doses_tab' %}?date={{ today }}" hx-target="#daily-doses-container" hx-swap="outerHTML" style="margin-left: 10px;">Today</button>
+    </div>
 
-<div id="daily-doses-container"
-  hx-get="/api/doses/daily/?date={{ today }}"
-  hx-trigger="load, reload-doses from:body"
-  hx-ext="json-wrap, client-side-templates"
-  nunjucks-template="daily-doses-template">
-  <p class="mdc-typography--body1" style="padding: 1rem;">Loading today's doses...</p>
-</div>
-
-{% verbatim %}
-<template id="daily-doses-template">
-    {% if data.length === 0 %}
-        <p class="mdc-typography--body1" style="padding: 1rem;">No doses scheduled for today.</p>
-    {% else %}
-        {% for dose in data %}
-        <div class="mdc-card" style="margin-bottom: 1rem; padding: 1rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-                <div style="flex-grow: 1;">
-                    <h2 class="mdc-typography--headline6" style="margin: 0;">{{ dose.name }}</h2>
-                    <h3 class="mdc-typography--subtitle2" style="margin: 0; color: #666;">
-                        {{ dose.scheduled_quantity }} &times; {{ dose.scheduled_strength or 'N/A' }}
-                    </h3>
-                    <p class="mdc-typography--body2" style="margin: 0.5rem 0 0 0;">
-                        Scheduled: {{ dose.scheduled_datetime.slice(11, 16) }}
-                    </p>
-                    <p class="mdc-typography--body2" style="margin: 0.5rem 0 0 0;">
-                        Status: <strong style="text-transform: uppercase;">{{ dose.status }}</strong>
-                    </p>
+    <div class="dose-section">
+        <h4>Pending Doses</h4>
+        <ul>
+        {% for log in pending_doses %}
+            <li>
+                <strong>{{ log.scheduled_datetime|date:"h:i A" }}</strong> - {{ log.name }} ({{ log.scheduled_strength }})
+                <div class="actions" style="margin-top: 5px;">
+                    <button hx-post="/api/doses/{{ log.log_id }}/take/" hx-swap="none" hx-on:htmx:after-request="location.reload()">Take</button>
+                    <button hx-post="/api/doses/{{ log.log_id }}/skip/" hx-swap="none" hx-on:htmx:after-request="location.reload()">Skip</button>
+                    <button hx-delete="/api/doses/{{ log.log_id }}/" hx-swap="none" hx-on:htmx:after-request="location.reload()">Delete</button>
                 </div>
-                <div>
-                    {% if dose.status == 'pending' %}
-                        <button class="mdc-button mdc-button--raised" 
-                                hx-post="/api/doses/{{ dose.log_id }}/take/" 
-                                hx-swap="none" 
-                                hx-on::after-request="if(event.detail.successful) htmx.trigger('body', 'reload-doses')">Take</button>
-                        
-                        <button class="mdc-button mdc-button--outlined" 
-                                hx-post="/api/doses/{{ dose.log_id }}/skip/" 
-                                hx-swap="none" 
-                                hx-on::after-request="if(event.detail.successful) htmx.trigger('body', 'reload-doses')">Skip</button>
-                        
-                        <button class="mdc-button" onclick="rescheduleDose('{{ dose.log_id }}')">Reschedule</button>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+            </li>
+        {% empty %}
+            <li>No pending doses.</li>
         {% endfor %}
-    {% endif %}
-</template>
-{% endverbatim %}
+        </ul>
+    </div>
 
-<script>
-    function rescheduleDose(logId) {
-        let newDt = prompt("Enter new datetime (Format: YYYY-MM-DD HH:MM:SS)");
-        if(newDt) {
-            fetch(`/api/doses/${logId}/reschedule/`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({new_datetime: newDt})
-            }).then(res => {
-                if(res.ok) { htmx.trigger('body', 'reload-doses'); } else { alert("Failed. Check format."); }
-            });
-        }
-    }
-</script>
+    <div class="dose-section">
+        <h4>Taken Doses</h4>
+        <ul>
+        {% for log in taken_doses %}
+            <li>
+                <strong>{{ log.scheduled_datetime|date:"h:i A" }}</strong> - {{ log.name }}
+                <div class="actions" style="margin-top: 5px;">
+                    <!-- "Untake" reverting back to pending via existing views.py endpoint -->
+                    <form hx-patch="/api/doses/{{ log.log_id }}/status/" hx-swap="none" hx-on:htmx:after-request="location.reload()" style="display:inline;">
+                        <input type="hidden" name="new_status" value="pending">
+                        <button type="submit">Untake (Revert)</button>
+                    </form>
+                </div>
+            </li>
+        {% empty %}
+            <li>No taken doses.</li>
+        {% endfor %}
+        </ul>
+    </div>
+
+    <div class="dose-section">
+        <h4>Missed / Skipped Doses</h4>
+        <ul>
+        {% for log in missed_doses %}
+            <li>
+                <strong>{{ log.scheduled_datetime|date:"h:i A" }}</strong> - {{ log.name }} (Status: {{ log.status|title }})
+                <div class="actions" style="margin-top: 5px;">
+                    <!-- "Unskip" reverting back to pending via existing views.py endpoint -->
+                    <form hx-patch="/api/doses/{{ log.log_id }}/status/" hx-swap="none" hx-on:htmx:after-request="location.reload()" style="display:inline;">
+                        <input type="hidden" name="new_status" value="pending">
+                        <button type="submit">Unskip (Revert to Pending)</button>
+                    </form>
+                </div>
+            </li>
+        {% empty %}
+            <li>No missed or skipped doses.</li>
+        {% endfor %}
+        </ul>
+    </div>
+    
+    <hr/>
+    <h4>Ad-Hoc Actions</h4>
+    <button hx-post="/api/doses/sweep-expired/" hx-swap="none" hx-on:htmx:after-request="location.reload()" style="margin-bottom: 15px;">Sweep Expired Doses</button>
+
+    <h5>Log Ad-Hoc Dose</h5>
+    <form hx-post="/api/doses/ad-hoc/" hx-swap="none" hx-on:htmx:after-request="location.reload()">
+        <select name="medication_id" required>
+            <option value="">Select Medication...</option>
+            {% for med in medications %}
+                <option value="{{ med.medication_id }}">{{ med.name }}</option>
+            {% endfor %}
+        </select>
+        <input type="number" name="quantity" placeholder="Quantity" step="0.01" required style="width: 100px;">
+        <input type="text" name="strength" placeholder="Strength (optional)" style="width: 120px;">
+        <button type="submit">Log Dose</button>
+    </form>
+</div>

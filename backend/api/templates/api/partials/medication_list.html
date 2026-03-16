@@ -1,96 +1,136 @@
-<div class="mdc-layout-grid">
-    <div class="mdc-layout-grid__inner">
-        <div class="mdc-layout-grid__cell mdc-layout-grid__cell--span-4-desktop mdc-layout-grid__cell--span-12-mobile">
-            <div id="med-list-container"
-                 class="mdc-list"
-                 hx-get="/api/medications/"
-                 hx-trigger="load, reload-meds from:body"
-                 hx-ext="json-wrap, client-side-templates"
-                 nunjucks-template="med-list-template">
-              <div class="mdc-list-item">Loading...</div>
+<div>
+    <h3>Refill Alerts</h3>
+    <ul>
+    {% for alert in alerts %}
+        <li style="color: red;"><strong>{{ alert.name }}</strong> is low! Only {{ alert.amount_left }} left.</li>
+    {% empty %}
+        <li>No refill alerts.</li>
+    {% endfor %}
+    </ul>
+
+    <h3>Active Inventory</h3>
+    <ul>
+    {% for med in medications %}
+        <li style="margin-bottom: 15px;">
+            <strong>{{ med.name }}</strong> ({{ med.strength }}) - {{ med.amount_left }} left
+            <div class="actions" style="margin-top: 5px;">
+                <form hx-post="/api/medications/{{ med.medication_id }}/refill/" hx-swap="none" hx-on:htmx:after-request="location.reload()" style="display:inline;">
+                    <input type="number" name="amount_added" step="0.01" placeholder="Add Amount" required style="width: 100px;">
+                    <button type="submit">Refill</button>
+                </form>
+                
+                <form hx-post="/api/medications/{{ med.medication_id }}/upgrade/" hx-swap="none" hx-on:htmx:after-request="location.reload()" style="display:inline;">
+                    <input type="text" name="new_strength" placeholder="New Strength" required style="width: 120px;">
+                    <button type="submit">Upgrade</button>
+                </form>
+
+                <button hx-post="/api/medications/{{ med.medication_id }}/archive/" hx-swap="none" hx-on:htmx:after-request="location.reload()">Archive</button>
+                <button hx-delete="/api/medications/{{ med.medication_id }}/" hx-swap="none" hx-on:htmx:after-request="location.reload()" style="color: red;">Purge</button>
             </div>
-        </div>
-        <div class="mdc-layout-grid__cell mdc-layout-grid__cell--span-8-desktop mdc-layout-grid__cell--span-12-mobile" id="med-detail-area">
-            <div class="mdc-card" style="padding: 1rem;">
-                <p class="mdc-typography--body1">Select a medication to view or edit details.</p>
+
+            <div class="schedules-section" style="margin-top: 15px; margin-left: 20px; padding: 10px; border-left: 3px solid #eee;">
+                <h5 style="margin-top: 0; margin-bottom: 10px;">Scheduling Details</h5>
+                <form hx-post="/api/medications/{{ med.medication_id }}/generate-schedule/" hx-swap="none" hx-on:htmx:after-request="location.reload()" style="margin-bottom: 15px;">
+                    <input type="hidden" name="days_ahead" value="30">
+                    <button type="submit" style="font-size: 0.85em;">Sync Future Doses (30 Days)</button>
+                    <span style="font-size: 0.8em; color: #666; margin-left: 10px;">Run this after database imports or bulk schedule changes.</span>
+                </form>
+                {% for sched in med.schedules %}
+                    <div style="margin-bottom: 8px;">
+                        <form hx-put="/api/schedules/{{ sched.schedule_id }}/" hx-swap="none" hx-on:htmx:after-request="location.reload()" style="display:inline-block; margin-right: 5px;">
+                            <input type="hidden" name="medication_id" value="{{ sched.medication_id }}">
+                            <select name="frequency_type" required onchange="window.toggleScheduleFields(this)">
+                                <option value="daily" {% if sched.frequency_type == 'daily' %}selected{% endif %}>Daily</option>
+                                <option value="weekly" {% if sched.frequency_type == 'weekly' %}selected{% endif %}>Weekly</option>
+                                <option value="interval" {% if sched.frequency_type == 'interval' %}selected{% endif %}>Interval</option>
+                                <option value="specific_days" {% if sched.frequency_type == 'specific_days' %}selected{% endif %}>Specific Days</option>
+                                <option value="as_needed" {% if sched.frequency_type == 'as_needed' %}selected{% endif %}>As Needed</option>
+                            </select>
+                            <input type="text" name="frequency_value" placeholder="Value (e.g. 2)" value="{{ sched.frequency_value|default:'' }}" style="width: 100px;">
+                            <input type="time" name="reminder_times" value="{{ sched.reminder_times.0|default:'' }}">
+                            <input type="time" name="reminder_times" value="{{ sched.reminder_times.1|default:'' }}">
+                            <input type="time" name="reminder_times" value="{{ sched.reminder_times.2|default:'' }}">
+                            <button type="submit">Update Schedule</button>
+                        </form>
+                        <form hx-delete="/api/schedules/{{ sched.schedule_id }}/" hx-swap="none" hx-on:htmx:after-request="location.reload()" style="display:inline-block;">
+                            <input type="hidden" name="medication_id" value="{{ sched.medication_id }}">
+                            <button type="submit" style="color: red;">Remove</button>
+                        </form>
+                    </div>
+                {% empty %}
+                    <p style="font-size: 0.9em; color: #666; margin: 0 0 10px 0;">No active schedules configured.</p>
+                {% endfor %}
+                <form hx-post="/api/schedules/" hx-swap="none" hx-on:htmx:after-request="location.reload()" style="margin-top: 5px;">
+                    <input type="hidden" name="medication_id" value="{{ med.medication_id }}">
+                    <select name="frequency_type" required onchange="window.toggleScheduleFields(this)">
+                        <option value="">New Schedule...</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="interval">Interval</option>
+                        <option value="specific_days">Specific Days</option>
+                        <option value="as_needed">As Needed</option>
+                    </select>
+                    <input type="text" name="frequency_value" placeholder="Value (e.g. 2)" style="width: 100px;">
+                    <input type="time" name="reminder_times">
+                    <input type="time" name="reminder_times">
+                    <button type="submit">Add Schedule</button>
+                </form>
             </div>
-        </div>
-    </div>
+        </li>
+    {% empty %}
+        <li>No active medications found.</li>
+    {% endfor %}
+    </ul>
+
+    <hr/>
+    <h3>Add New Medication</h3>
+    <form hx-post="/api/medications/" hx-swap="none" hx-on:htmx:after-request="location.reload()">
+        <input type="text" name="name" placeholder="Name" required><br/>
+        <select name="medication_type" style="margin: 5px 0;">
+            <option value="">Select Type...</option>
+            <option value="tablet">Tablet</option>
+            <option value="capsule">Capsule</option>
+            <option value="liquid">Liquid</option>
+            <option value="injection">Injection</option>
+            <option value="oil">Oil</option>
+            <option value="topical">Topical</option>
+            <option value="other">Other</option>
+        </select><br/>
+        <input type="text" name="strength" placeholder="Strength"><br/>
+        <input type="text" name="condition_treated" placeholder="Condition Treated"><br/>
+        <input type="number" name="amount_left" placeholder="Amount Left" step="0.01" value="0"><br/>
+        <input type="number" name="refill_threshold" placeholder="Refill Threshold" step="0.01" value="0"><br/>
+        <button type="submit" style="margin-top: 10px;">Add Medication</button>
+    </form>
 </div>
 
-{% verbatim %}
-<template id="med-list-template">
-    {% for med in data %}
-      <div class="mdc-list-item" tabindex="0"
-           hx-get="/api/medications/{{ med.medication_id }}/"
-           hx-target="#med-detail-area"
-           hx-ext="json-wrap, client-side-templates"
-           nunjucks-template="med-detail-template"
-           style="cursor: pointer; border-bottom: 1px solid #eee;">
-        <span class="mdc-list-item__ripple"></span>
-        <span class="mdc-list-item__text">
-          <span class="mdc-list-item__primary-text">{{ med.name }}</span>
-          <span class="mdc-list-item__secondary-text">Left: {{ med.amount_left }}</span>
-        </span>
-      </div>
-    {% endfor %}
-</template>
-
-<template id="med-detail-template">
-    <div class="mdc-card" style="padding: 1rem;">
-        <h2 class="mdc-typography--headline5">{{ data.name }}</h2>
-        
-        <form hx-patch="/api/medications/{{ data.medication_id }}/details/"
-              hx-swap="none"
-              hx-on::after-request="if(event.detail.successful) { alert('Saved!'); htmx.trigger('body', 'reload-meds'); } else { alert('Error saving.'); }">
+<script>
+    if (typeof window.toggleScheduleFields === 'undefined') {
+        window.toggleScheduleFields = function(selectElem) {
+            var form = selectElem.closest('form');
+            var type = selectElem.value;
+            var freqValue = form.querySelector('input[name="frequency_value"]');
+            var timeInputs = form.querySelectorAll('input[type="time"]');
             
-            <div style="margin-bottom: 1rem;">
-                <label class="mdc-typography--subtitle2">Name</label><br>
-                <input type="text" name="name" value="{{ data.name }}" style="width: 100%; padding: 8px;">
-            </div>
+            if (freqValue) {
+                if (['interval', 'weekly', 'specific_days'].includes(type)) {
+                    freqValue.style.display = 'inline-block';
+                } else {
+                    freqValue.style.display = 'none';
+                }
+            }
             
-            <div style="margin-bottom: 1rem;">
-                <label class="mdc-typography--subtitle2">Strength</label><br>
-                <input type="text" name="strength" value="{{ data.strength }}" style="width: 100%; padding: 8px;">
-            </div>
-            <div style="margin-bottom: 1rem;">
-                <label class="mdc-typography--subtitle2">Condition Treated</label><br>
-                <input type="text" name="condition_treated" value="{{ data.condition_treated }}" style="width: 100%; padding: 8px;">
-            </div>
-            
-            <div style="margin-bottom: 1rem;">
-                <label class="mdc-typography--subtitle2">Medication Type</label><br>
-                <select name="medication_type" style="width: 100%; padding: 8px;">
-                    <option value="">Select a Type...</option>
-                    {% if data.medication_type == 'tablet' %}<option value="tablet" selected>Tablet</option>{% else %}<option value="tablet">Tablet</option>{% endif %}
-                    {% if data.medication_type == 'capsule' %}<option value="capsule" selected>Capsule</option>{% else %}<option value="capsule">Capsule</option>{% endif %}
-                    {% if data.medication_type == 'liquid' %}<option value="liquid" selected>Liquid</option>{% else %}<option value="liquid">Liquid</option>{% endif %}
-                    {% if data.medication_type == 'injection' %}<option value="injection" selected>Injection</option>{% else %}<option value="injection">Injection</option>{% endif %}
-                    {% if data.medication_type == 'oil' %}<option value="oil" selected>Oil</option>{% else %}<option value="oil">Oil</option>{% endif %}
-                    {% if data.medication_type == 'topical' %}<option value="topical" selected>Topical</option>{% else %}<option value="topical">Topical</option>{% endif %}
-                    {% if data.medication_type == 'other' %}<option value="other" selected>Other</option>{% else %}<option value="other">Other</option>{% endif %}
-                </select>
-            </div>
-            
-            <div style="margin-bottom: 1rem;">
-                <label class="mdc-typography--subtitle2">Amount Left</label><br>
-                <input type="number" step="0.01" name="amount_left" value="{{ data.amount_left }}" style="width: 100%; padding: 8px;">
-            </div>
-            <div style="margin-bottom: 1rem;">
-                <label class="mdc-typography--subtitle2">Refill Threshold</label><br>
-                <input type="number" step="0.01" name="refill_threshold" value="{{ data.refill_threshold }}" style="width: 100%; padding: 8px;">
-            </div>
-            <div style="margin-bottom: 1rem;">
-                <label class="mdc-typography--subtitle2">Treatment Duration (Days)</label><br>
-                <input type="number" name="treatment_duration_days" value="{{ data.treatment_duration_days }}" style="width: 100%; padding: 8px;">
-            </div>
-            <div style="margin-bottom: 1rem;">
-                <label class="mdc-typography--subtitle2">Instructions</label><br>
-                <textarea name="instructions" style="width: 100%; padding: 8px; height: 80px;">{{ data.instructions }}</textarea>
-            </div>
-            
-            <button type="submit" class="mdc-button mdc-button--raised">Save Changes</button>
-        </form>
-    </div>
-</template>
-{% endverbatim %}
+            if (timeInputs) {
+                if (type === 'as_needed') {
+                    timeInputs.forEach(function(i) { i.style.display = 'none'; });
+                } else {
+                    timeInputs.forEach(function(i) { i.style.display = 'inline-block'; });
+                }
+            }
+        };
+    }
+    
+    document.querySelectorAll('select[name="frequency_type"]').forEach(function(el) {
+        window.toggleScheduleFields(el);
+    });
+</script>
