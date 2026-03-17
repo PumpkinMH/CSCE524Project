@@ -90,6 +90,29 @@ class DeleteDoseView(View):
         return redirect(f"{reverse('api:daily_doses')}?date={date_str}")
 
 
+class AddAdHocDoseWebView(View):
+    def get(self, request):
+        response = requests.get(f"{BASE_URL}/medications/")
+        medications = response.json() if response.status_code == 200 else []
+        context = {'medications': medications}
+        return render(request, 'api/add_adhoc_dose.html', context)
+
+    def post(self, request):
+        medication_id = request.POST.get('medication_id')
+        quantity = request.POST.get('quantity')
+        strength = request.POST.get('strength')
+        
+        data = {
+            'medication_id': medication_id,
+            'quantity': quantity,
+            'strength': strength
+        }
+        
+        requests.post(f"{BASE_URL}/doses/ad-hoc/", json=data)
+        
+        return redirect(reverse('api:daily_doses'))
+
+
 def _api_error_handler(func):
     """Decorator for APIView dispatch method to handle common exceptions."""
     def wrapper(*args, **kwargs):

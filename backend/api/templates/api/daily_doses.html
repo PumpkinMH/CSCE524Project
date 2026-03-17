@@ -11,6 +11,7 @@
     <div class="nav-buttons">
         <a href="?date={{ prev_date|date:'Y-m-d' }}">Previous Day</a>
         <a href="?date={{ next_date|date:'Y-m-d' }}">Next Day</a>
+        <a href="{% url 'api:add_adhoc_dose' %}" class="button">Add Ad-Hoc Dose</a>
     </div>
 
     <table>

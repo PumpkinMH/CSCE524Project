@@ -10,6 +10,7 @@ urlpatterns = [
     path('doses/web/<uuid:log_id>/edit/', views.EditDoseWebView.as_view(), name='edit_dose'),
     path('doses/web/<uuid:log_id>/update_status/', views.UpdateDoseStatusView.as_view(), name='update_status'),
     path('doses/web/<uuid:log_id>/delete/', views.DeleteDoseView.as_view(), name='delete_dose'),
+    path('doses/web/ad-hoc/', views.AddAdHocDoseWebView.as_view(), name='add_adhoc_dose'),
 
     # Medication URLs
     path('medications/', views.MedicationListCreateView.as_view(), name='medication-list-create'),
