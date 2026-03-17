@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+{% load static %}
+<html>
+<head>
+    <title>Modify Schedule</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'api/style.css' %}">
+</head>
+<body>
+    <h1>Modify Schedule for {{ medication.name }}</h1>
+
+    <form action="{% url 'api:modify_schedule' medication.medication_id %}" method="post">
+        {% csrf_token %}
+        
+        <label for="frequency_type">Frequency Type:</label>
+        <select id="frequency_type" name="frequency_type">
+            <option value="daily" {% if schedule.frequency_type == 'daily' %}selected{% endif %}>Daily</option>
+            <option value="weekly" {% if schedule.frequency_type == 'weekly' %}selected{% endif %}>Weekly</option>
+            <option value="monthly" {% if schedule.frequency_type == 'monthly' %}selected{% endif %}>Monthly</option>
+        </select><br>
+
+        <label for="frequency_value">Frequency Value:</label>
+        <input type="number" id="frequency_value" name="frequency_value" value="{{ schedule.frequency_value }}"><br>
+        
+        <label for="start_date">Start Date:</label>
+        <input type="date" id="start_date" name="start_date" value="{{ schedule.start_date|date:'Y-m-d' }}"><br>
+
+        <label for="end_date">End Date:</label>
+        <input type="date" id="end_date" name="end_date" value="{{ schedule.end_date|date:'Y-m-d' }}"><br>
+
+        <input type="submit" value="Update Schedule" class="button">
+    </form>
+
+    <a href="{% url 'api:medications_list' %}" class="button">Back to Medications</a>
+</body>
+</html>

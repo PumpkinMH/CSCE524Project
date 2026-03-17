@@ -5,6 +5,13 @@ app_name = 'api'
 
 urlpatterns = [
     # Web Views
+    path('medications/web/', views.MedicationsWebView.as_view(), name='medications_list'),
+    path('medications/web/add/', views.AddMedicationWebView.as_view(), name='add_medication'),
+    path('medications/web/<uuid:medication_id>/update/', views.UpdateMedicationWebView.as_view(), name='update_medication'),
+    path('medications/web/<uuid:medication_id>/purge/', views.PurgeMedicationWebView.as_view(), name='purge_medication'),
+    path('medications/web/<uuid:medication_id>/modify-schedule/', views.ModifyScheduleWebView.as_view(), name='modify_schedule'),
+    path('medications/web/<uuid:medication_id>/refill/', views.RefillMedicationWebView.as_view(), name='refill_medication'),
+    path('medications/web/<uuid:medication_id>/archive/', views.ArchiveMedicationWebView.as_view(), name='archive_medication'),
     path('doses/web/', views.DailyDoseWebView.as_view(), name='daily_doses'),
     path('doses/web/<uuid:log_id>/reschedule/', views.RescheduleDoseWebView.as_view(), name='reschedule_dose'),
     path('doses/web/<uuid:log_id>/edit/', views.EditDoseWebView.as_view(), name='edit_dose'),

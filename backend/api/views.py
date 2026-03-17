@@ -19,6 +19,110 @@ BASE_URL = "http://localhost:8000/api"
 
 # === Web Views ===
 
+class MedicationsWebView(View):
+    def get(self, request):
+        response = requests.get(f"{BASE_URL}/medications/")
+        medications = response.json() if response.status_code == 200 else []
+        context = {'medications': medications}
+        return render(request, 'api/medications.html', context)
+
+class AddMedicationWebView(View):
+    def get(self, request):
+        return render(request, 'api/add_medication.html')
+
+    def post(self, request):
+        data = {
+            'name': request.POST.get('name'),
+            'medication_type': request.POST.get('medication_type'),
+            'strength': request.POST.get('strength'),
+            'condition_treated': request.POST.get('condition_treated'),
+            'instructions': request.POST.get('instructions'),
+            'amount_left': request.POST.get('amount_left'),
+            'refill_threshold': request.POST.get('refill_threshold')
+        }
+        requests.post(f"{BASE_URL}/medications/", json=data)
+        return redirect(reverse('api:medications_list'))
+
+class UpdateMedicationWebView(View):
+    def get(self, request, medication_id):
+        response = requests.get(f"{BASE_URL}/medications/{medication_id}/")
+        medication = response.json() if response.status_code == 200 else None
+        context = {'medication': medication}
+        return render(request, 'api/update_medication.html', context)
+
+    def post(self, request, medication_id):
+        data = {
+            'strength': request.POST.get('strength'),
+            'condition_treated': request.POST.get('condition_treated'),
+            'instructions': request.POST.get('instructions'),
+        }
+        requests.patch(f"{BASE_URL}/medications/{medication_id}/details/", json=data)
+        return redirect(reverse('api:medications_list'))
+
+class PurgeMedicationWebView(View):
+    def post(self, request, medication_id):
+        requests.delete(f"{BASE_URL}/medications/{medication_id}/")
+        return redirect(reverse('api:medications_list'))
+
+class ModifyScheduleWebView(View):
+    def get(self, request, medication_id):
+        # Fetch medication details to get the schedule ID
+        med_response = requests.get(f"{BASE_URL}/medications/{medication_id}/")
+        medication = med_response.json() if med_response.status_code == 200 else None
+        
+        if not medication or not medication.get('schedule_id'):
+            # Handle case where medication or schedule is not found
+            return redirect(reverse('api:medications_list'))
+
+        schedule_id = medication['schedule_id']
+        sched_response = requests.get(f"{BASE_URL}/schedules/{schedule_id}/")
+        schedule = sched_response.json() if sched_response.status_code == 200 else None
+
+        context = {
+            'medication': medication,
+            'schedule': schedule
+        }
+        return render(request, 'api/modify_schedule.html', context)
+
+    def post(self, request, medication_id):
+        # Similar to get, find the schedule_id first
+        med_response = requests.get(f"{BASE_URL}/medications/{medication_id}/")
+        medication = med_response.json() if med_response.status_code == 200 else None
+        
+        if not medication or not medication.get('schedule_id'):
+            return redirect(reverse('api:medications_list'))
+        
+        schedule_id = medication['schedule_id']
+        
+        data = {
+            'frequency_type': request.POST.get('frequency_type'),
+            'frequency_value': request.POST.get('frequency_value'),
+            'start_date': request.POST.get('start_date'),
+            'end_date': request.POST.get('end_date'),
+        }
+        requests.patch(f"{BASE_URL}/schedules/{schedule_id}/", json=data)
+        return redirect(reverse('api:medications_list'))
+
+class ArchiveMedicationWebView(View):
+    def post(self, request, medication_id):
+        requests.post(f"{BASE_URL}/medications/{medication_id}/archive/")
+        return redirect(reverse('api:medications_list'))
+
+class RefillMedicationWebView(View):
+    def get(self, request, medication_id):
+        response = requests.get(f"{BASE_URL}/medications/{medication_id}/")
+        medication = response.json() if response.status_code == 200 else None
+        context = {'medication': medication}
+        return render(request, 'api/refill_medication.html', context)
+
+    def post(self, request, medication_id):
+        amount = request.POST.get('amount')
+        if amount:
+            requests.post(f"{BASE_URL}/medications/{medication_id}/refill/", json={'amount_added': amount})
+        return redirect(reverse('api:medications_list'))
+
+
+
 class DailyDoseWebView(View):
     def get(self, request):
         date_str = request.GET.get('date', timezone.now().strftime('%Y-%m-%d'))

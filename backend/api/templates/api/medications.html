@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+{% load static %}
+<html>
+<head>
+    <title>Medications</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'api/style.css' %}">
+</head>
+<body>
+    <h1>Active Medications</h1>
+
+    <div class="nav-buttons">
+        <a href="{% url 'api:daily_doses' %}" class="button">Daily Doses</a>
+        <a href="{% url 'api:add_medication' %}" class="button">Add New Medication</a>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Strength</th>
+                <th>Amount Left</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for med in medications %}
+            <tr>
+                <td>{{ med.name }}</td>
+                <td>{{ med.strength|default:'N/A' }}</td>
+                <td>{{ med.amount_left }}</td>
+                <td>
+                    <a href="{% url 'api:update_medication' med.medication_id %}" class="button">Update Details</a>
+                    <a href="{% url 'api:refill_medication' med.medication_id %}" class="button">Refill</a>
+                    <form action="{% url 'api:archive_medication' med.medication_id %}" method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="submit" value="Archive" class="button">
+                    </form>
+                    <form action="{% url 'api:purge_medication' med.medication_id %}" method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="submit" value="Purge" class="button">
+                    </form>
+                    <a href="{% url 'api:modify_schedule' med.medication_id %}" class="button">Modify Schedule</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
