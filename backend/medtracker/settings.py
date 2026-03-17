@@ -94,9 +94,6 @@ DATABASES = {
         'PASSWORD': 'Tacking-Oversight-Earache',  # Change to your PostgreSQL password
         'HOST': 'localhost',
         'PORT': '5432',               # 5432 is the standard PostgreSQL port
-        'OPTIONS': {
-            'options': '-c search_path=medtracker,public'
-        },
     }
 }
 # UNCOMMENT THIS LINE TO DEPLOY ON RENDER
@@ -151,3 +148,4 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'api/static')]

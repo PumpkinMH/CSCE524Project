@@ -4,6 +4,13 @@ from . import views
 app_name = 'api'
 
 urlpatterns = [
+    # Web Views
+    path('doses/web/', views.DailyDoseWebView.as_view(), name='daily_doses'),
+    path('doses/web/<uuid:log_id>/reschedule/', views.RescheduleDoseWebView.as_view(), name='reschedule_dose'),
+    path('doses/web/<uuid:log_id>/edit/', views.EditDoseWebView.as_view(), name='edit_dose'),
+    path('doses/web/<uuid:log_id>/update_status/', views.UpdateDoseStatusView.as_view(), name='update_status'),
+    path('doses/web/<uuid:log_id>/delete/', views.DeleteDoseView.as_view(), name='delete_dose'),
+
     # Medication URLs
     path('medications/', views.MedicationListCreateView.as_view(), name='medication-list-create'),
     path('medications/refill-alerts/', views.MedicationRefillAlertsView.as_view(), name='medication-refill-alerts'),

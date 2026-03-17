@@ -116,7 +116,7 @@ class DoseLogDAO:
             .filter(scheduled_datetime__date=target_date)
             .order_by('scheduled_datetime')
             .annotate(name=F('medication__name'))
-            .values('log_id', 'name', 'scheduled_datetime', 'status', 'scheduled_strength', 'scheduled_quantity', 'notes'))
+            .values('log_id', 'name', 'scheduled_datetime', 'status', 'scheduled_strength', 'scheduled_quantity', 'notes', taken_datetime=F('actual_datetime_taken')))
 
     @staticmethod
     def mark_as_taken(log_id, actual_datetime_taken, actual_strength, actual_quantity):

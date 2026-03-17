@@ -1,3 +1,9 @@
+from django.shortcuts import render, redirect
+from django.urls import reverse
+from django.views import View
+from django.utils import timezone
+from datetime import timedelta
+import requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -8,6 +14,81 @@ from datetime import datetime
 from django.utils.decorators import method_decorator
 from rest_framework.exceptions import APIException
 from django.http import JsonResponse
+
+BASE_URL = "http://localhost:8000/api"
+
+# === Web Views ===
+
+class DailyDoseWebView(View):
+    def get(self, request):
+        date_str = request.GET.get('date', timezone.now().strftime('%Y-%m-%d'))
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            date = timezone.now().date()
+
+        response = requests.get(f"{BASE_URL}/doses/daily/", params={'date': date_str})
+        doses = response.json() if response.status_code == 200 else []
+        
+        for dose in doses:
+            if dose.get('scheduled_datetime'):
+                dose['scheduled_datetime'] = datetime.fromisoformat(dose['scheduled_datetime'].replace('Z', '+00:00'))
+            if dose.get('taken_datetime'):
+                dose['taken_datetime'] = datetime.fromisoformat(dose['taken_datetime'].replace('Z', '+00:00'))
+        
+        context = {
+            'doses': doses,
+            'current_date': date,
+            'prev_date': date - timedelta(days=1),
+            'next_date': date + timedelta(days=1),
+        }
+        return render(request, 'api/daily_doses.html', context)
+
+class RescheduleDoseWebView(View):
+    def get(self, request, log_id):
+        response = requests.get(f"{BASE_URL}/doses/{log_id}/")
+        dose = response.json() if response.status_code == 200 else None
+        context = {'dose': dose}
+        return render(request, 'api/reschedule_dose.html', context)
+
+    def post(self, request, log_id):
+        new_datetime_str = request.POST.get('new_datetime')
+        if new_datetime_str:
+            new_datetime = datetime.fromisoformat(new_datetime_str).isoformat()
+            requests.post(f"{BASE_URL}/doses/{log_id}/reschedule/", json={'new_datetime': new_datetime})
+        date_str = request.GET.get('date')
+        return redirect(f"{reverse('api:daily_doses')}?date={date_str}")
+
+class EditDoseWebView(View):
+    def get(self, request, log_id):
+        response = requests.get(f"{BASE_URL}/doses/{log_id}/")
+        dose = response.json() if response.status_code == 200 else None
+        context = {'dose': dose}
+        return render(request, 'api/edit_dose.html', context)
+
+    def post(self, request, log_id):
+        new_strength = request.POST.get('new_strength')
+        new_quantity = request.POST.get('new_quantity')
+        requests.patch(f"{BASE_URL}/doses/{log_id}/", json={'new_strength': new_strength, 'new_quantity': new_quantity})
+        date_str = request.GET.get('date')
+        return redirect(f"{reverse('api:daily_doses')}?date={date_str}")
+
+class UpdateDoseStatusView(View):
+    def post(self, request, log_id):
+        status = request.POST.get('status')
+        if status == 'taken':
+            requests.post(f"{BASE_URL}/doses/{log_id}/take/")
+        elif status == 'skipped':
+            requests.post(f"{BASE_URL}/doses/{log_id}/skip/")
+        date_str = request.GET.get('date')
+        return redirect(f"{reverse('api:daily_doses')}?date={date_str}")
+
+class DeleteDoseView(View):
+    def post(self, request, log_id):
+        requests.delete(f"{BASE_URL}/doses/{log_id}/")
+        date_str = request.GET.get('date')
+        return redirect(f"{reverse('api:daily_doses')}?date={date_str}")
+
 
 def _api_error_handler(func):
     """Decorator for APIView dispatch method to handle common exceptions."""

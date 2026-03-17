@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+{% load static %}
+<html>
+<head>
+    <title>Daily Doses</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'api/style.css' %}">
+</head>
+<body>
+    <h1>Daily Doses for {{ current_date }}</h1>
+
+    <div class="nav-buttons">
+        <a href="?date={{ prev_date|date:'Y-m-d' }}">Previous Day</a>
+        <a href="?date={{ next_date|date:'Y-m-d' }}">Next Day</a>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Medication</th>
+                <th>Scheduled Time</th>
+                <th>Taken Time</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for dose in doses %}
+            <tr>
+                <td>{{ dose.name }}</td>
+                <td>{{ dose.scheduled_datetime|date:'H:i' }}</td>
+                <td>{{ dose.taken_datetime|date:'H:i'|default:'N/A' }}</td>
+                <td>{{ dose.status }}</td>
+                <td>
+                    <form action="{% url 'api:update_status' dose.log_id %}?date={{ current_date|date:'Y-m-d' }}" method="post" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" name="status" value="taken">Take</button>
+                        <button type="submit" name="status" value="skipped">Skip</button>
+                    </form>
+                    <a href="{% url 'api:reschedule_dose' dose.log_id %}?date={{ current_date|date:'Y-m-d' }}">Reschedule</a>
+                    <a href="{% url 'api:edit_dose' dose.log_id %}?date={{ current_date|date:'Y-m-d' }}">Edit</a>
+                    <form action="{% url 'api:delete_dose' dose.log_id %}?date={{ current_date|date:'Y-m-d' }}" method="post" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

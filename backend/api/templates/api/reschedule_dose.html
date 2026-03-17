@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+{% load static %}
+<html>
+<head>
+    <title>Reschedule Dose</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'api/style.css' %}">
+</head>
+<body>
+    <h1>Reschedule Dose</h1>
+    <form method="post">
+        {% csrf_token %}
+        <label for="new_datetime">New Date and Time:</label>
+        <input type="datetime-local" id="new_datetime" name="new_datetime" value="{{ dose.scheduled_datetime|date:'Y-m-d\TH:i' }}">
+        <button type="submit">Save</button>
+    </form>
+</body>
+</html>

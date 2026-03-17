@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+{% load static %}
+<html>
+<head>
+    <title>Edit Dose</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'api/style.css' %}">
+</head>
+<body>
+    <h1>Edit Dose</h1>
+    <form method="post">
+        {% csrf_token %}
+        <label for="new_strength">New Strength:</label>
+        <input type="text" id="new_strength" name="new_strength" value="{{ dose.scheduled_strength }}">
+        <label for="new_quantity">New Quantity:</label>
+        <input type="number" id="new_quantity" name="new_quantity" value="{{ dose.scheduled_quantity }}">
+        <button type="submit">Save</button>
+    </form>
+</body>
+</html>
